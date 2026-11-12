@@ -470,10 +470,10 @@ async function vInforme(_, qs) {
   const ms = allMatches().filter(m => DB.cases.some(c => c.match.id === m.id) || m.source === 'manual');
   const cs = DB.cases.filter(c => !sel || c.match.id === sel);
   const orders = (DB.orders || []).filter(o => cs.some(c => c.id === o.caseId));
-  const claims = (DB.claims || []).filter(r => !r.orderId || orders.some(o => o.id === r.orderId));
+  const claims = (DB.claims || []).filter(r => r.orderId ? orders.some(o => o.id === r.orderId) : !sel);
   const au = await verifyAudit();
   const ahora = new Date().toISOString();
-  const resumen = { generado: ahora, partido: sel || 'todos', expedientes: cs.map(c => [c.num, c.version, c.seal ? c.seal.sha256 : null]), ordenes: orders.length, auditoria: DB.audit.length ? DB.audit[DB.audit.length - 1].hash : null };
+  const resumen = { generado: ahora, partido: sel || 'todos', expedientes: cs.map(c => [c.num, c.version, c.target, c.estado, c.seal ? c.seal.sha256 : null, c.analysis ? c.analysis.reportSha256 : null]), ordenes: orders.map(o => [o.num, o.objetivo, o.estado]), reclamos: claims.map(r => [r.dominio, r.estado, r.orderId]), auditoria: DB.audit.length ? DB.audit[DB.audit.length - 1].hash : null };
   const hash = await sha256Hex(stable(resumen));
   const fila = (k, v) => v ? `<tr><th>${esc(k)}</th><td>${v}</td></tr>` : '';
   const card = (c) => {
