@@ -89,6 +89,7 @@ class Puente:
         self.juez_sim: Dict[str, str] = {}       # inverso
         self.filas: Dict[str, str] = {}          # EXP-…/RE-… -> id de la fila en expedientes
         self.cache_ordenes: Dict[str, str] = {}
+        self.resumen_publicado: Dict[str, str] = {}
         self.reclamos_publicados: Dict[str, str] = {}
         self.ultimos_turnos: Dict[str, tuple] = {}
         self.cola_audit: List[dict] = []
@@ -164,8 +165,11 @@ class Puente:
     def publicar_expedientes(self) -> None:
         with self.plat.lock:
             nuevos = [(t, self.plat.resumen_item("expediente", t)) for t in self.plat.tramites.values()
-                      if t["expediente_id"] not in self.filas]
+                      if t["expediente_id"] not in self.filas or t["estado"] == "pendiente"]
         for t, r in nuevos:
+            clave = estable(r)
+            if self.resumen_publicado.get(t["expediente_id"]) == clave:
+                continue
             exp = self.plat.expediente(t["expediente_id"])
             r = dict(r, juez_asignado=t["juez_asignado"])
             contenido = {"origen": "motor", "tipo": "expediente", "resumen": r,
@@ -180,7 +184,13 @@ class Puente:
             ]
             fila = self.fila_expediente(t["expediente_id"], contenido, r["stream_url"], r["host"], checks,
                                         bool(t.get("reincidente")))
-            self.filas[t["expediente_id"]] = self.sb.upsert("expedientes", fila, "numero")[0]["id"]
+            if t["expediente_id"] in self.filas:
+                # evidencia nueva mientras espera firma: el juez firma siempre la versión vigente (RLS compara sha256)
+                self.sb.update("expedientes", f"id=eq.{self.filas[t['expediente_id']]}&estado=eq.en_cola_juez",
+                               {k: fila[k] for k in ("contenido", "consenso", "sha256", "objetivo", "host_video")})
+            else:
+                self.filas[t["expediente_id"]] = self.sb.upsert("expedientes", fila, "numero")[0]["id"]
+            self.resumen_publicado[t["expediente_id"]] = clave
 
     def publicar_reenvios(self) -> None:
         with self.plat.lock:
