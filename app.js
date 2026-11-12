@@ -402,7 +402,7 @@ async function vExp(id) {
    ${tsaBox(c.analysisTsa, 'Sello del informe técnico')}` : ''}</div>
 
   <div class="card step ${c.captures.length ? (c.captures.every(x => x.tsa && x.tsa.genTime) ? 'done' : 'warn') : ''}"><div class="fig">PASO 4.0</div><h2>Capturas: hashes y sellos de tiempo</h2>
-  <p class="small mut">El archivo no sale de tu teléfono: el SHA-256 se calcula localmente y solo el hash viaja a la autoridad de sellado (RFC 3161: FreeTSA y, si no responde, DigiCert, Sectigo o GlobalSign). Guardá el archivo original: cualquier alteración cambia el hash.</p>
+  <p class="small mut">El archivo no sale de tu teléfono: el SHA-256 se calcula localmente y solo el hash viaja a la autoridad de sellado (RFC 3161: FreeTSA y, si no responde, Sectigo). Guardá el archivo original: cualquier alteración cambia el hash.</p>
   ${ro ? '' : `<label class="btn">+ Agregar capturas (foto/video)<input type="file" multiple accept="image/*,video/*" hidden onchange="addCaptures('${c.id}',this.files)"></label>`}
   <div id="capStatus"></div>
   <div class="thumbs" style="margin:8px 0">${c.captures.filter(x => x.thumb).map(x => `<img src="${x.thumb}" alt="">`).join('')}</div>

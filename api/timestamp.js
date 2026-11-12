@@ -30,9 +30,7 @@ function genTime(buf) {
 
 const TSAS = [
   { id: 'freetsa', name: 'FreeTSA (freetsa.org)', url: 'https://freetsa.org/tsr', ms: 8000 },
-  { id: 'digicert', name: 'DigiCert', url: 'http://timestamp.digicert.com', ms: 6000 },
-  { id: 'sectigo', name: 'Sectigo', url: 'http://timestamp.sectigo.com', ms: 6000 },
-  { id: 'globalsign', name: 'GlobalSign', url: 'http://timestamp.globalsign.com/tsa/r6advanced1', ms: 6000 },
+  { id: 'sectigo', name: 'Sectigo', url: 'https://timestamp.sectigo.com', ms: 10000 },
 ];
 
 function derAt(buf, i) {

@@ -87,7 +87,7 @@ Función serverless `api/analyze` que:
 #### 4. Hashes de la captura y sellos de tiempo
 
 - Las capturas (foto o video) se procesan **en el teléfono**: el SHA-256 se calcula localmente y **el archivo no se sube a ningún lado**; solo el hash viaja a la autoridad de sellado.
-- Cada hash se sella con **FreeTSA (RFC 3161)**; si no responde, se pide a **DigiCert**, **Sectigo** o **GlobalSign** (en ese orden). El expediente guarda qué TSA selló (`tsa.tsaId`). Si ninguna responde, el sello queda pendiente con un botón **Reintentar sello** (también para el sello del expediente, que solo suma a la solidez cuando tiene hora oficial).
+- Cada hash se sella con **FreeTSA (RFC 3161)**; si no responde, se pide a **Sectigo**. Solo se usan TSAs por HTTPS: la función no verifica la firma CMS del token, así que una TSA por HTTP plano permitiría que alguien en el camino inyecte un sello falso. El expediente guarda qué TSA selló (`tsa.tsaId`). Si ninguna responde, el sello queda pendiente con un botón **Reintentar sello** (también para el sello del expediente, que solo suma a la solidez cuando tiene hora oficial).
 - Los videos de más de 64 MB se hashean **por partes** (SHA-256 incremental, bloques de 4 MB) para no cargar el archivo entero en la memoria del celular.
 - La **demo** trae una captura de ejemplo generada en el momento, con hash y sello reales: arranca en 95 % y llega al 100 % con **Sellar expediente** o **Correr el oráculo**.
 - Se guarda el token `.tsr` (descargable), la hora oficial (`genTime`) y se comprueba que el hash quedó incluido en el sello.
@@ -165,7 +165,7 @@ Celular (navegador)                         Vercel (funciones serverless)
 
 - **Frontend**: HTML + JS + CSS sin frameworks ni build. Todo en `app.js`.
 - **Backend**: 3 funciones Node 20 sin dependencias (`fetch` nativo). `api/_lib.js` tiene utilidades compartidas.
-- **Sellado RFC 3161**: `api/timestamp.js` arma el `TimeStampReq` en DER a mano (SHA-256, nonce aleatorio, `certReq=true`), lo manda a FreeTSA (con DigiCert → Sectigo → GlobalSign de respaldo), valida el `PKIStatus`, la hora y que el hash esté en el token, y devuelve el `.tsr` en base64, la hora (`genTime`) y si el hash aparece en el token.
+- **Sellado RFC 3161**: `api/timestamp.js` arma el `TimeStampReq` en DER a mano (SHA-256, nonce aleatorio, `certReq=true`), lo manda a FreeTSA (con Sectigo de respaldo, ambas por HTTPS), valida el `PKIStatus`, la hora y que el hash esté en el token, y devuelve el `.tsr` en base64, la hora (`genTime`) y si el hash aparece en el token.
 - **Diseño**: estética editorial inspirada en [Object — Football As Football](https://object.design/work/football-as-football/): fondo verde césped, tipografía grotesca grande (Plus Jakarta Sans), titulares blanco/negro, paneles negros tipo "figura" (`PASO 1.0`, `FIG 1.0`), menú a pantalla completa con ítems numerados y grilla de partidos con escudos en los colores de cada club (si la fuente no trae escudo, se dibuja uno con las iniciales).
 - **Protección SSRF**: antes de descargar cualquier URL se resuelve el DNS y se rechazan IPs privadas/loopback/link-local.
 - **Seguridad del contenido**: todo lo que viene de sitios piratas (títulos, URLs, dominios) se escapa antes de mostrarse.
@@ -181,7 +181,7 @@ Celular (navegador)                         Vercel (funciones serverless)
 | ASN, titular, prefijo, país | [RIPEstat](https://stat.ripe.net) | Gratis, sin clave |
 | Sitios en la misma IP | [HackerTarget reverse IP](https://hackertarget.com/reverse-ip-lookup/) | Límite diario de consultas |
 | Registro de dominio | [rdap.org](https://rdap.org) | |
-| Sello de tiempo | [FreeTSA](https://freetsa.org) (RFC 3161); respaldo DigiCert, Sectigo, GlobalSign | |
+| Sello de tiempo | [FreeTSA](https://freetsa.org) (RFC 3161); respaldo [Sectigo](https://timestamp.sectigo.com) | |
 
 ---
 
@@ -200,7 +200,7 @@ curl -O https://freetsa.org/files/tsa.crt
 # 3) Verificar el sello (.tsr descargado desde el expediente)
 openssl ts -verify -digest <SHA256_DE_LA_CAPTURA> -in sello.tsr -CAfile cacert.pem -untrusted tsa.crt
 # → Verification: OK
-# Si lo selló una TSA de respaldo (DigiCert / Sectigo / GlobalSign), el certificado viene en el .tsr:
+# Si lo selló la TSA de respaldo (Sectigo), el certificado viene en el .tsr:
 # openssl ts -verify -digest <SHA256> -in sello.tsr -CAfile /etc/ssl/certs/ca-certificates.crt
 
 # 4) Ver la hora oficial del sello
