@@ -18,6 +18,7 @@ async function remoteAudit(accion, expediente_id, detalle) { if (sb && SESSION) 
 /* Publicar a la cola compartida cuando el oráculo da consenso */
 async function publishRemote(c) {
   if (!sb || !SESSION || c.remoteId || c.estado !== 'en_cola_juez') return;
+  if (!c.seal || !c.seal.tsa || !c.seal.tsa.genTime) return toast('Falta el sello de tiempo: reintentá el sello y después publicá');
   const dh = c.analysis && c.analysis.deliveryHost;
   const { data, error } = await sb.from('expedientes').insert({ numero: c.num + '-' + c.id.slice(0, 4), partido: c.match, kickoff: c.match.kickoff, jurisdiccion: caseJur(c), objetivo: hostOf(c.target), host_video: dh || null, estado: 'en_cola_juez', consenso: c.consensus, contenido: sealPayload(c), sha256: c.seal.sha256, tsa: c.seal.tsa || null, reportado_por: SESSION.user.id }).select('id').single();
   if (error) return toast('No se pudo publicar: ' + error.message);
