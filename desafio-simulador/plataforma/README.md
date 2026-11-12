@@ -21,6 +21,38 @@ Usuarios de demostración (ficticios):
 
 Para el partido final, apuntar `--simulador` a la IP asignada.
 
+## Con Supabase (la app del equipo hace de interfaz del juez)
+
+El motor sigue hablando con el simulador, pero publica todo en el Supabase de la app web. El juez firma desde
+`https://expedientes-futbol.vercel.app/#/juez` y el motor manda las órdenes a los proveedores.
+
+1. Una sola vez, en el SQL Editor de Supabase: `supabase/schema.sql` (si no se corrió) y después `supabase/motor.sql`.
+2. En la compu del equipo, conectada a la red del simulador:
+
+```bash
+export SUPABASE_SERVICE_KEY=...   # Project Settings → API → service_role. Nunca al repositorio.
+python plataforma/servidor.py --simulador http://<ip-asignada>:8080 --supabase-url https://<proyecto>.supabase.co
+```
+
+Al arrancar, el motor:
+- crea en Supabase Auth a `laura@jueces.test` y `martin@jueces.test` (mismas contraseñas de la tabla de arriba);
+- copia los turnos del simulador a `turnos`, en hora real, así la RLS solo deja firmar al juez de turno.
+
+| Qué | Dónde queda en Supabase |
+|---|---|
+| Expediente de cada servidor pirata, con resumen, IP/ASN, marca y riesgo colateral | `expedientes` (`en_cola_juez`, `contenido.origen = 'motor'`) |
+| Firma o rechazo del juez desde la app | `firmas` / `expedientes.estado`: el motor lo toma y firma la orden con HMAC para el simulador |
+| Reenvío que necesita otra firma (el juez que firmó salió de turno) | `expedientes` con número `RE-…` |
+| Estado de cada orden en cada proveedor: aplicada, fallida, reintentos, vencida, levantada | `ordenes` (`origen = 'motor'`) |
+| Reclamos del simulador con la verificación del motor; el juez los acepta o rechaza en la app | `reclamos` |
+| Cada evento de la auditoría local, con su hash | `auditoria` (`detalle.hash_local`) |
+
+La auditoría local y `entrega/` se siguen generando igual, y `verificar.py` se corre igual.
+Si Supabase se corta, el motor sigue enviando y confirmando órdenes y reintenta la sincronización.
+
+Prueba sin la app, con un juez automático que usa la clave anon y la RLS igual que el navegador:
+`python pruebas/juez_supabase.py --supabase-url <url> --anon <clave-anon>`.
+
 ## Qué hace
 
 1. **Expediente** (`expedientes.py`): marca de agua verificada contra el partido y los licenciatarios, servidor (host, IP y ASN), riesgo colateral por DNS pasivo (IP o dominio), hashes encadenados de las capturas, promoción y vencimiento.

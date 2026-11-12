@@ -14,6 +14,7 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import secrets
 import sys
 import threading
@@ -696,6 +697,8 @@ def main() -> None:
     a.add_argument("--verificar-auditoria", type=Path)
     a.add_argument("--forzar-bloqueo-ip", action="append", default=[], metavar="HOST",
                    help="solo para probar reclamos: pide IP para este host aunque la IP sea compartida")
+    a.add_argument("--supabase-url", default=os.environ.get("SUPABASE_URL"),
+                   help="publica expedientes y toma las firmas de la app (clave en SUPABASE_SERVICE_KEY)")
     args = a.parse_args()
     if args.verificar_auditoria:
         sys.exit(verificar_auditoria(args.verificar_auditoria))
@@ -704,11 +707,20 @@ def main() -> None:
     if plat.forzar_ip:
         plat.audit.registrar("modo_prueba_reclamos", None, "sistema", forzar_bloqueo_ip=sorted(plat.forzar_ip))
     Manejador.plat = plat
+    puente = None
+    if args.supabase_url:
+        from supabase_puente import Puente
+        puente = Puente(plat, args.supabase_url, os.environ["SUPABASE_SERVICE_KEY"], plat.usuarios,
+                        json.loads(args.juzgados.read_text(encoding="utf-8")))
+        puente.preparar()
+        print(f"Supabase conectado: {args.supabase_url}", flush=True)
 
     def bucle() -> None:
         while True:
             try:
                 plat.ciclo()
+                if puente:
+                    puente.sincronizar()
             except Exception as e:  # noqa: BLE001 - el ciclo no debe morir durante el partido
                 plat.audit.registrar("error_interno", plat.minuto, "sistema", error=repr(e))
                 print("error:", repr(e), flush=True)

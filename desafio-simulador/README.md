@@ -1,7 +1,7 @@
 > **Esta carpeta, en el repo del equipo:** es la plataforma que corre contra el simulador oficial del desafío
 > (lo que mide `evaluacion/verificar.py` en el partido final). Python 3.9+ sin dependencias.
 > El código propio está en `plataforma/` y `pruebas/`; `simulador/`, `datos/`, `evaluacion/` y `ejemplos/` son del
-> repo del desafío (qualydata-org/desafio-futbol). Cómo correrla: `plataforma/README.md`.
+> repo del desafío (qualydata-org/desafio-futbol). Cómo correrla, sola o conectada al Supabase de la app: `plataforma/README.md`.
 > Resultados de la corrida de práctica, informe PDF, auditoría, evidencia y avisos: `entrega/`.
 
 # Desafío Fútbol: plataforma federal de órdenes de bloqueo en vivo
