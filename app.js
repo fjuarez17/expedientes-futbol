@@ -232,7 +232,7 @@ async function vPanel() {
   </div>
   ${sec('Próximos partidos', upcoming.length ? matchTiles(upcoming) : '<p>Sin partidos próximos cargados. <a href="#/partidos">Agregar partido</a></p>')}
   <div class="card"><div class="row sp"><h2>Últimos expedientes</h2><a href="#/expedientes">Ver todos</a></div><div class="list">${cs.slice(-5).reverse().map(caseRow).join('') || '<p class="mut">Todavía no hay expedientes.</p>'}</div>
-  <button class="ghost" onclick="loadDemo()">Cargar expediente de demostración</button></div>
+  <div class="row"><button class="ghost" onclick="loadDemo()">Cargar expediente de demostración${DB.matches.some(x => x.source === 'manual') ? ' (con el último partido agregado)' : ''}</button>${cs.some(c => c.demo) ? '<button class="ghost" onclick="clearDemo()">Borrar datos de demostración</button>' : ''}</div></div>
   <section class="sec"><h3 class="lbl">Cómo funciona</h3><div class="prose"><b>Así se arma un expediente.</b> Elegís el partido, pegás el enlace pirata y la plataforma sigue la cadena página → reproductor embebido → manifiesto de video → segmentos, para llegar al servidor que realmente entrega el video (host, IP, ASN). Evalúa cuántos sitios comparten esa IP, verifica la marca de agua forense contra el partido y el licenciatario, calcula hashes SHA-256 y pide sellos de tiempo RFC 3161 a una autoridad externa. Cada acción queda en un registro de auditoría encadenado por hash.</div></section>`;
 }
 
@@ -254,11 +254,11 @@ window.addMatch = async () => {
   if (home === away) return toast('Local y visitante iguales');
   if (!ko) return toast('Poné fecha y hora');
   const m = { id: 'm-' + uid(), home, away, kickoff: new Date(ko + ':00-03:00').toISOString(), league: $('#mComp').value, source: 'manual' };
-  DB.matches.push(m); save(); await audit('partido_agregado', null, matchName(m) + ' ' + m.kickoff); toast('Partido agregado'); route();
+  DB.matches.push(m); save(); await audit('partido_agregado', null, matchName(m) + ' ' + m.kickoff); toast('Partido agregado: ahora pegá el enlace pirata'); location.hash = '#/nuevo?match=' + encodeURIComponent(m.id);
 };
 
 async function vNuevo(_, qs) {
-  const ms = allMatches(); const sel = qs.get('match');
+  const ms = allMatches(); const sel = qs.get('match') || (DB.matches.filter(x => x.source === 'manual').slice(-1)[0] || {}).id;
   return `${hero('Nuevo expediente', 'en tres datos: el partido, el enlace pirata y, si lo tenés, el video.')}<div class="card">
   <label>Partido</label><select id="nMatch">${ms.map(m => `<option value="${esc(m.id)}" ${m.id === sel ? 'selected' : ''}>${esc(matchName(m))} · ${fmtD(m.kickoff)}</option>`).join('')}</select>
   <label>URL de la página pirata (donde se ve el reproductor)</label><input id="nUrl" placeholder="https://sitio-pirata.xyz/canal/tnt" inputmode="url">
@@ -321,7 +321,7 @@ async function vExp(id) {
   const dh = a && a.hosts.find(h => h.host === a.deliveryHost);
   const ro = !!c.seal;
   const wm = c.watermark;
-  return `<div class="row sp"><h1>${esc(c.num)} ${c.demo ? '<span class="pill warn">DEMO</span>' : ''}</h1><div class="row noprint"><button class="ghost" onclick="window.print()">PDF / Imprimir</button><button class="ghost" onclick="exportCase('${c.id}')">JSON</button></div></div>
+  return `<div class="row sp"><h1>${esc(c.num)} ${c.demo ? '<span class="pill warn">DEMO</span>' : ''}</h1><div class="row noprint"><button onclick="downloadPdf('${esc(c.num)}_v${c.version}')">Descargar informe PDF</button><button class="ghost" onclick="window.print()">Imprimir</button><button class="ghost" onclick="exportCase('${c.id}')">JSON</button></div></div>
   <div class="card"><div class="row sp"><div><b>${esc(matchName(c.match))}</b><div class="small mut">${esc(c.match.league || '')} · ${fmt(c.match.kickoff)}${c.match.venue ? ' · ' + esc(c.match.venue) : ''}</div></div>${c.seal ? '<span class="pill ok">Sellado v' + c.version + '</span>' : '<span class="pill warn">Borrador v' + c.version + '</span>'}</div>
   <table style="margin-top:8px"><tr><th>Enlace pirata</th><td class="mono">${esc(c.target)}</td></tr><tr><th>Creado</th><td>${fmt(c.createdAt)}</td></tr>${c.notes ? `<tr><th>Notas</th><td>${esc(c.notes)}</td></tr>` : ''}</table>
   <h3>Solidez del expediente: ${s.pct}%</h3><div class="bar"><i style="width:${s.pct}%"></i></div>
@@ -462,6 +462,17 @@ window.reopen = async (id) => {
   c.version++; c.seal = null; save(); await audit('nueva_version', id, `v${c.version}`); route();
 };
 window.delCase = async (id) => { if (!confirm('¿Eliminar expediente? Queda registrado en auditoría.')) return; const c = getCase(id); DB.cases = DB.cases.filter(x => x.id !== id); save(); await audit('expediente_eliminado', id, c.num); go('#/expedientes'); };
+window.downloadPdf = async (nombre) => {
+  if (typeof html2pdf === 'undefined') return window.print();
+  toast('Generando PDF…');
+  document.body.classList.add('pdf');
+  try {
+    await html2pdf().set({ margin: 10, filename: nombre + '.pdf', image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true }, jsPDF: { unit: 'mm', format: 'a4' },
+      pagebreak: { mode: ['css', 'legacy'], avoid: '.card' } }).from($('#app')).save();
+    await audit('informe_pdf', null, nombre);
+  } finally { document.body.classList.remove('pdf'); }
+};
 window.exportCase = (id) => { const c = getCase(id); download(`${c.num}_v${c.version}.json`, JSON.stringify({ format: 'expedientes-futbol/1', exportedAt: new Date().toISOString(), case: c, audit: DB.audit.filter(e => e.caseId === id) }, null, 1)); };
 window.exportAll = () => download(`expedientes_${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ format: 'expedientes-futbol-db/1', exportedAt: new Date().toISOString(), db: DB }, null, 1));
 window.importAll = async (f) => {
@@ -550,14 +561,21 @@ async function vAuditoria() {
 }
 
 /* --- Demo --- */
+window.clearDemo = async () => {
+  if (!confirm('¿Borrar los expedientes y partidos de demostración? Queda registrado en auditoría.')) return;
+  const n = DB.cases.filter(c => c.demo).length;
+  DB.cases = DB.cases.filter(c => !c.demo); DB.matches = DB.matches.filter(m => m.source !== 'demo');
+  save(); await audit('demo_borrada', null, `${n} expediente(s)`); toast('Datos de demostración borrados'); route();
+};
 window.loadDemo = async () => {
-  const m = { id: 'm-demo-' + uid(), home: 'Boca Juniors', away: 'River Plate', kickoff: new Date(Date.now() - 35 * 60e3).toISOString(), league: 'Liga Profesional de Fútbol', source: 'demo' };
-  DB.matches.push(m);
+  const propio = DB.matches.filter(x => x.source === 'manual').slice(-1)[0];
+  const m = propio || { id: 'm-demo-' + uid(), home: 'Boca Juniors', away: 'River Plate', kickoff: new Date(Date.now() - 35 * 60e3).toISOString(), league: 'Liga Profesional de Fútbol', source: 'demo' };
+  if (!propio) DB.matches.push(m);
   const pay = await makePayload(m.id, 'ESP', '4F1C09A2');
   if (!DB.marks.some(k => k.payload === pay)) DB.marks.push({ payload: pay, session: '4F1C09A2', note: 'decodificador #4471 (demo)' });
   DB.seq++;
   const c = { id: uid(), demo: true, num: `EXP-${new Date().getFullYear()}-${String(DB.seq).padStart(4, '0')}`, createdAt: new Date().toISOString(), version: 1,
-    match: { id: m.id, home: m.home, away: m.away, kickoff: m.kickoff, league: 'Liga Profesional de Fútbol' }, target: 'https://futbol-gratis-demo.example/en-vivo/espn-premium', videoUrl: null, notes: 'Caso ficticio de demostración (datos de documentación RFC 5737).',
+    match: { id: m.id, home: m.home, away: m.away, kickoff: m.kickoff, league: m.league || 'Liga Profesional de Fútbol' }, target: 'https://futbol-gratis-demo.example/en-vivo/espn-premium', videoUrl: null, notes: 'Caso ficticio de demostración (datos de documentación RFC 5737).',
     analysis: { target: 'https://futbol-gratis-demo.example/en-vivo/espn-premium', startedAt: new Date().toISOString(), analyzer: 'demo', deliveryHost: 'edge7.live-cdn-demo.example', notes: [], rdap: [{ domain: 'futbol-gratis-demo.example', registrar: 'Registrador Demo', abuse: 'abuse@registrador.example', created: '2025-03-01T00:00:00Z', expires: '2027-03-01T00:00:00Z' }],
       chain: [{ url: 'https://futbol-gratis-demo.example/en-vivo/espn-premium', depth: 0, status: 200, title: 'ESPN Premium EN VIVO gratis', sha256: 'demo' }, { url: 'https://player-demo.example/embed/espn1', depth: 1, status: 200 }],
       video: [{ url: 'https://edge7.live-cdn-demo.example/hls/espn1/index.m3u8', type: 'HLS (m3u8)', status: 200, segments: ['https://edge7.live-cdn-demo.example/hls/espn1/seg_10233.ts'] }],
