@@ -87,7 +87,10 @@ Función serverless `api/analyze` que:
 #### 4. Hashes de la captura y sellos de tiempo
 
 - Las capturas (foto o video) se procesan **en el teléfono**: el SHA-256 se calcula localmente y **el archivo no se sube a ningún lado**; solo el hash viaja a la autoridad de sellado.
-- Cada hash se sella con **FreeTSA (RFC 3161)**: se guarda el token `.tsr` (descargable), la hora oficial (`genTime`) y se comprueba que el hash quedó incluido en el sello.
+- Cada hash se sella con **FreeTSA (RFC 3161)**; si no responde, se pide a **DigiCert**, **Sectigo** o **GlobalSign** (en ese orden). El expediente guarda qué TSA selló (`tsa.tsaId`). Si ninguna responde, el sello queda pendiente con un botón **Reintentar sello** (también para el sello del expediente, que solo suma a la solidez cuando tiene hora oficial).
+- Los videos de más de 64 MB se hashean **por partes** (SHA-256 incremental, bloques de 4 MB) para no cargar el archivo entero en la memoria del celular.
+- La **demo** trae una captura de ejemplo generada en el momento, con hash y sello reales: arranca en 95 % y llega al 100 % con **Sellar expediente** o **Correr el oráculo**.
+- Se guarda el token `.tsr` (descargable), la hora oficial (`genTime`) y se comprueba que el hash quedó incluido en el sello.
 - Se guarda una miniatura chica de las fotos para el PDF.
 - Se probó la verificación externa con `openssl ts -verify` → `Verification: OK`.
 
@@ -156,13 +159,13 @@ Celular (navegador)                         Vercel (funciones serverless)
 │ - SHA-256 local (WebCrypto) │            │                  m3u8, segmentos,    │
 │ - localStorage (base)       │  POST hash │                  dns.google, RIPEstat│
 │ - auditoría encadenada      │ ─────────► │                  hackertarget, RDAP  │
-│ - export JSON / PDF         │            │ api/timestamp  → FreeTSA (RFC 3161)  │
+│ - export JSON / PDF         │            │ api/timestamp  → TSAs RFC 3161      │
 └─────────────────────────────┘            └──────────────────────────────────────┘
 ```
 
 - **Frontend**: HTML + JS + CSS sin frameworks ni build. Todo en `app.js`.
 - **Backend**: 3 funciones Node 20 sin dependencias (`fetch` nativo). `api/_lib.js` tiene utilidades compartidas.
-- **Sellado RFC 3161**: `api/timestamp.js` arma el `TimeStampReq` en DER a mano (SHA-256, nonce aleatorio, `certReq=true`), lo manda a FreeTSA y devuelve el `.tsr` en base64, la hora (`genTime`) y si el hash aparece en el token.
+- **Sellado RFC 3161**: `api/timestamp.js` arma el `TimeStampReq` en DER a mano (SHA-256, nonce aleatorio, `certReq=true`), lo manda a FreeTSA (con DigiCert → Sectigo → GlobalSign de respaldo), valida el `PKIStatus`, la hora y que el hash esté en el token, y devuelve el `.tsr` en base64, la hora (`genTime`) y si el hash aparece en el token.
 - **Diseño**: estética editorial inspirada en [Object — Football As Football](https://object.design/work/football-as-football/): fondo verde césped, tipografía grotesca grande (Plus Jakarta Sans), titulares blanco/negro, paneles negros tipo "figura" (`PASO 1.0`, `FIG 1.0`), menú a pantalla completa con ítems numerados y grilla de partidos con escudos en los colores de cada club (si la fuente no trae escudo, se dibuja uno con las iniciales).
 - **Protección SSRF**: antes de descargar cualquier URL se resuelve el DNS y se rechazan IPs privadas/loopback/link-local.
 - **Seguridad del contenido**: todo lo que viene de sitios piratas (títulos, URLs, dominios) se escapa antes de mostrarse.
@@ -178,7 +181,7 @@ Celular (navegador)                         Vercel (funciones serverless)
 | ASN, titular, prefijo, país | [RIPEstat](https://stat.ripe.net) | Gratis, sin clave |
 | Sitios en la misma IP | [HackerTarget reverse IP](https://hackertarget.com/reverse-ip-lookup/) | Límite diario de consultas |
 | Registro de dominio | [rdap.org](https://rdap.org) | |
-| Sello de tiempo | [FreeTSA](https://freetsa.org) (RFC 3161) | |
+| Sello de tiempo | [FreeTSA](https://freetsa.org) (RFC 3161); respaldo DigiCert, Sectigo, GlobalSign | |
 
 ---
 
@@ -197,6 +200,8 @@ curl -O https://freetsa.org/files/tsa.crt
 # 3) Verificar el sello (.tsr descargado desde el expediente)
 openssl ts -verify -digest <SHA256_DE_LA_CAPTURA> -in sello.tsr -CAfile cacert.pem -untrusted tsa.crt
 # → Verification: OK
+# Si lo selló una TSA de respaldo (DigiCert / Sectigo / GlobalSign), el certificado viene en el .tsr:
+# openssl ts -verify -digest <SHA256> -in sello.tsr -CAfile /etc/ssl/certs/ca-certificates.crt
 
 # 4) Ver la hora oficial del sello
 openssl ts -reply -in sello.tsr -text
@@ -237,7 +242,7 @@ Cosas necesarias para usarla en producción y que **no están hechas**:
 - **Panel por partido y por fecha**: cantidad de streams, tiempo hasta la detección, tiempo hasta el bloqueo, efectividad por ISP.
 - **PWA instalable y modo offline** (service worker) para trabajar en la cancha o con mala señal.
 - **Internacionalización** y soporte para otras competencias (Copa de la Liga, Copa Argentina, Primera Nacional, Libertadores).
-- **Rendimiento**: pasar el hashing de videos grandes a streaming por partes para no cargar el archivo entero en memoria del celular.
+- **Rendimiento**: mover el hashing de videos grandes a un Web Worker para que la interfaz no se trabe mientras calcula.
 
 ---
 
@@ -251,7 +256,7 @@ Cosas necesarias para usarla en producción y que **no están hechas**:
 ├── api/
 │   ├── _lib.js         # Utilidades: fetch con timeout, DNS, RIPEstat, reverse IP, RDAP, clasificación de ASN/CDN
 │   ├── analyze.js      # Análisis técnico: cadena de carga, servidor de video, riesgo colateral
-│   ├── timestamp.js    # Sellado RFC 3161 contra FreeTSA
+│   ├── timestamp.js    # Sellado RFC 3161 (FreeTSA + respaldos)
 │   └── fixtures.js     # Fixture de la Liga Profesional (TheSportsDB)
 └── vercel.json         # Config de Vercel (timeout de funciones y cabeceras)
 ```

@@ -8,6 +8,53 @@ async function sha256Hex(data) {
   const h = await crypto.subtle.digest('SHA-256', buf);
   return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
+const K256 = new Uint32Array([0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2]);
+// SHA-256 incremental: WebCrypto no hashea por partes y un video entero en memoria puede colgar el celular.
+class Sha256 {
+  constructor() { this.h = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]); this.buf = new Uint8Array(64); this.bl = 0; this.len = 0; this.w = new Uint32Array(64); }
+  block(d, o) {
+    const w = this.w, h = this.h;
+    for (let i = 0; i < 16; i++) w[i] = (d[o + 4 * i] << 24) | (d[o + 4 * i + 1] << 16) | (d[o + 4 * i + 2] << 8) | d[o + 4 * i + 3];
+    for (let i = 16; i < 64; i++) {
+      const a = w[i - 15], b = w[i - 2];
+      w[i] = (w[i - 16] + (((a >>> 7) | (a << 25)) ^ ((a >>> 18) | (a << 14)) ^ (a >>> 3)) + w[i - 7] + (((b >>> 17) | (b << 15)) ^ ((b >>> 19) | (b << 13)) ^ (b >>> 10))) | 0;
+    }
+    let A = h[0], B = h[1], C = h[2], D = h[3], E = h[4], F = h[5], G = h[6], H = h[7];
+    for (let i = 0; i < 64; i++) {
+      const t1 = (H + (((E >>> 6) | (E << 26)) ^ ((E >>> 11) | (E << 21)) ^ ((E >>> 25) | (E << 7))) + ((E & F) ^ (~E & G)) + K256[i] + w[i]) | 0;
+      const t2 = ((((A >>> 2) | (A << 30)) ^ ((A >>> 13) | (A << 19)) ^ ((A >>> 22) | (A << 10))) + ((A & B) ^ (A & C) ^ (B & C))) | 0;
+      H = G; G = F; F = E; E = (D + t1) | 0; D = C; C = B; B = A; A = (t1 + t2) | 0;
+    }
+    h[0] += A; h[1] += B; h[2] += C; h[3] += D; h[4] += E; h[5] += F; h[6] += G; h[7] += H;
+  }
+  update(d) {
+    let i = 0; this.len += d.length;
+    if (this.bl) {
+      i = Math.min(64 - this.bl, d.length); this.buf.set(d.subarray(0, i), this.bl); this.bl += i;
+      if (this.bl < 64) return this;
+      this.block(this.buf, 0); this.bl = 0;
+    }
+    for (; i + 64 <= d.length; i += 64) this.block(d, i);
+    if (i < d.length) { this.buf.set(d.subarray(i)); this.bl = d.length - i; }
+    return this;
+  }
+  hex() {
+    const bits = this.len * 8, pad = new Uint8Array((this.bl < 56 ? 56 : 120) - this.bl + 8);
+    pad[0] = 0x80; const dv = new DataView(pad.buffer);
+    dv.setUint32(pad.length - 8, Math.floor(bits / 2 ** 32)); dv.setUint32(pad.length - 4, bits >>> 0);
+    this.update(pad);
+    return [...this.h].map(x => x.toString(16).padStart(8, '0')).join('');
+  }
+}
+async function sha256File(f, onProgress) {
+  if (f.size <= 64 * 2 ** 20) return sha256Hex(await f.arrayBuffer());
+  const h = new Sha256(), CH = 4 * 2 ** 20;
+  for (let o = 0; o < f.size; o += CH) {
+    h.update(new Uint8Array(await f.slice(o, o + CH).arrayBuffer()));
+    if (onProgress) onProgress(Math.min(1, (o + CH) / f.size));
+  }
+  return h.hex();
+}
 function stable(v) {
   if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
   if (v && typeof v === 'object') return '{' + Object.keys(v).sort().filter(k => v[k] !== undefined).map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
@@ -169,7 +216,7 @@ function score(c) {
     ['Capturas con sello de tiempo RFC 3161', 10, c.captures.length > 0 && c.captures.every(x => x.tsa && x.tsa.genTime)],
     ['Promoción del enlace documentada', 5, c.promos.length > 0],
     ['Vencimiento propuesto', 5, !!c.expiry],
-    ['Expediente sellado', 5, !!c.seal],
+    ['Expediente sellado', 5, !!(c.seal && c.seal.tsa && c.seal.tsa.genTime)],
   ];
   return { items, pct: items.reduce((s, [, w, ok]) => s + (ok ? w : 0), 0) };
 }
@@ -315,6 +362,12 @@ function tsaBox(t, label) {
   if (t.error) return `<div class="stamp small" style="border-color:var(--bad)">Sello no obtenido: ${esc(t.error)}</div>`;
   return `<div class="stamp small">🕒 <b>${esc(label || 'Sello de tiempo')}</b>: ${fmt(t.genTime)} (${esc(t.genTime)}) · ${esc(t.tsa)} · ${t.imprintPresent ? 'hash incluido en el sello ✔' : 'revisar'}</div>`;
 }
+function verifyHint(hash, t) {
+  if (!t || !t.genTime) return '';
+  const ca = !t.tsaId || t.tsaId === 'freetsa' ? '-CAfile cacert.pem -untrusted tsa.crt' : '-CAfile /etc/ssl/certs/ca-certificates.crt';
+  const note = !t.tsaId || t.tsaId === 'freetsa' ? 'certificados en freetsa.org' : 'el certificado de la TSA viene dentro del sello; la raíz está en el almacén del sistema';
+  return `<p class="small mut">Verificación externa: <span class="mono">openssl ts -verify -digest ${esc(hash)} -in sello.tsr ${ca}</span> (${note}).</p>`;
+}
 async function vExp(id) {
   const c = getCase(id); if (!c) return '<p>Expediente no encontrado. <a href="#/expedientes">Volver</a></p>';
   const a = c.analysis, s = score(c), rein = reincidence(c);
@@ -349,7 +402,7 @@ async function vExp(id) {
    ${tsaBox(c.analysisTsa, 'Sello del informe técnico')}` : ''}</div>
 
   <div class="card step ${c.captures.length ? (c.captures.every(x => x.tsa && x.tsa.genTime) ? 'done' : 'warn') : ''}"><div class="fig">PASO 4.0</div><h2>Capturas: hashes y sellos de tiempo</h2>
-  <p class="small mut">El archivo no sale de tu teléfono: el SHA-256 se calcula localmente y solo el hash viaja a la autoridad de sellado (FreeTSA, RFC 3161). Guardá el archivo original: cualquier alteración cambia el hash.</p>
+  <p class="small mut">El archivo no sale de tu teléfono: el SHA-256 se calcula localmente y solo el hash viaja a la autoridad de sellado (RFC 3161: FreeTSA y, si no responde, DigiCert, Sectigo o GlobalSign). Guardá el archivo original: cualquier alteración cambia el hash.</p>
   ${ro ? '' : `<label class="btn">+ Agregar capturas (foto/video)<input type="file" multiple accept="image/*,video/*" hidden onchange="addCaptures('${c.id}',this.files)"></label>`}
   <div id="capStatus"></div>
   <div class="thumbs" style="margin:8px 0">${c.captures.filter(x => x.thumb).map(x => `<img src="${x.thumb}" alt="">`).join('')}</div>
@@ -365,10 +418,10 @@ async function vExp(id) {
   ${ro ? '' : `<button class="ghost" onclick="doExpiry('${c.id}')" ${a ? '' : 'disabled'}>${c.expiry ? 'Recalcular' : 'Proponer vencimiento'}</button>${a ? '' : ' <span class="small mut">(requiere análisis)</span>'}`}
   ${c.expiry ? `<p class="small">${esc(c.expiry.why)}</p><div class="tbl"><table><tr><th>Objetivo</th><th>Método</th><th>Vence</th></tr>${c.expiry.items.map((it, i) => `<tr><td>${esc(it.target)}${it.note ? `<div class="small mut">${esc(it.note)}</div>` : ''}</td><td>${esc(it.method)}</td><td>${it.until ? (ro ? fmt(it.until) : `<input type="date" value="${it.until.slice(0, 10)}" onchange="setUntil('${c.id}',${i},this.value)">`) : '—'}</td></tr>`).join('')}</table></div>` : ''}</div>
 
-  <div class="card step ${c.seal ? 'done' : ''}"><div class="fig">PASO 7.0</div><h2>Sellado del expediente</h2>
+  <div class="card step ${c.seal ? (c.seal.tsa && c.seal.tsa.genTime ? 'done' : 'warn') : ''}"><div class="fig">PASO 7.0</div><h2>Sellado del expediente</h2>
   ${c.seal ? `<div class="verdict ok">Expediente sellado. Hash SHA-256 del contenido:</div><div class="mono">${esc(c.seal.sha256)}</div>${tsaBox(c.seal.tsa, 'Sello del expediente')}
-   <div class="row noprint" style="margin-top:8px">${c.seal.tsa && c.seal.tsa.tsr ? `<button class="ghost" onclick="dlSealTsr('${c.id}')">Descargar sello .tsr</button>` : ''}<button class="ghost" onclick="reopen('${c.id}')">Nueva versión</button></div>
-   <p class="small mut">Verificación externa: <span class="mono">openssl ts -verify -digest ${esc(c.seal.sha256)} -in sello.tsr -CAfile cacert.pem -untrusted tsa.crt</span> (certificados en freetsa.org).</p>`
+   <div class="row noprint" style="margin-top:8px">${c.seal.tsa && c.seal.tsa.tsr ? `<button class="ghost" onclick="dlSealTsr('${c.id}')">Descargar sello .tsr</button>` : ''}${!c.seal.tsa || !c.seal.tsa.genTime ? `<button class="ghost" onclick="restampSeal('${c.id}')">Reintentar sello</button>` : ''}<button class="ghost" onclick="reopen('${c.id}')">Nueva versión</button></div>
+   ${verifyHint(c.seal.sha256, c.seal.tsa)}`
     : `<p class="small mut">Congela el expediente: calcula el SHA-256 de todo su contenido y lo sella con hora oficial. Cualquier cambio posterior se detecta en “Verificar”.</p><button class="ok" onclick="sealCase('${c.id}')">Sellar expediente</button>`}</div>
   ${await oracleCards(c)}
   <div class="row noprint"><button class="bad" onclick="delCase('${c.id}')">Eliminar</button></div>`;
@@ -378,8 +431,8 @@ async function vExp(id) {
 async function stamp(hash) {
   try {
     const r = await fetch('/api/timestamp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sha256: hash }) });
-    const j = await r.json(); if (!r.ok) return { error: j.error || 'error' };
-    return { tsa: j.tsa, genTime: j.genTime, imprintPresent: j.imprintPresent, nonce: j.nonce, tsr: j.tsr, status: j.status };
+    const j = await r.json(); if (!r.ok) return { error: (j.error || 'error') + (j.tried ? ` (${j.tried.join(' · ')})` : '') };
+    return { tsa: j.tsa, tsaId: j.tsaId, genTime: j.genTime, imprintPresent: j.imprintPresent, nonce: j.nonce, tsr: j.tsr, status: j.status };
   } catch { return { error: 'sin conexión con la TSA' }; }
 }
 window.runAnalysis = async (id) => {
@@ -416,7 +469,7 @@ window.addCaptures = async (id, files) => {
   const c = getCase(id); const st = $('#capStatus');
   for (const f of files) {
     st.innerHTML = `<p><span class="spin"></span> Calculando SHA-256 de ${esc(f.name)}…</p>`;
-    const hash = await sha256Hex(await f.arrayBuffer());
+    const hash = await sha256File(f, (k) => { st.innerHTML = `<p><span class="spin"></span> Calculando SHA-256 de ${esc(f.name)}… ${Math.round(k * 100)} %</p>`; });
     if (c.captures.some(x => x.sha256 === hash)) { toast('Captura repetida'); continue; }
     const cap = { name: f.name, size: f.size, type: f.type || 'desconocido', lastModified: new Date(f.lastModified).toISOString(), addedAt: new Date().toISOString(), sha256: hash, thumb: await thumbOf(f) };
     st.innerHTML = `<p><span class="spin"></span> Pidiendo sello de tiempo para ${esc(f.name)}…</p>`;
@@ -424,6 +477,12 @@ window.addCaptures = async (id, files) => {
     c.captures.push(cap); save();
     await audit('captura_agregada', id, `${f.name} sha256=${hash}`);
   }
+  route();
+};
+window.restampSeal = async (id) => {
+  const c = getCase(id); if (!c.seal) return;
+  toast('Pidiendo sello de tiempo…'); c.seal.tsa = await stamp(c.seal.sha256); save();
+  if (c.seal.tsa.genTime) await audit('expediente_sellado', id, `v${c.version} sha256=${c.seal.sha256} (sello reintentado)`);
   route();
 };
 window.restamp = async (id, i) => { const c = getCase(id); c.captures[i].tsa = await stamp(c.captures[i].sha256); save(); route(); };
@@ -442,7 +501,7 @@ window.addPromo = async (id) => {
   const c = getCase(id); const url = $('#pUrl').value.trim(); if (!hostOf(url)) return toast('URL inválida');
   const p = { platform: platformOf(url), url, account: $('#pAcc').value.trim(), reach: $('#pReach').value.trim(), addedAt: new Date().toISOString() };
   const f = $('#pFile').files[0];
-  if (f) { p.sha256 = await sha256Hex(await f.arrayBuffer()); p.file = f.name; p.tsa = await stamp(p.sha256); }
+  if (f) { p.sha256 = await sha256File(f); p.file = f.name; p.tsa = await stamp(p.sha256); }
   c.promos.push(p); save(); await audit('promocion_agregada', id, `${p.platform} ${url}`); route();
 };
 window.doExpiry = async (id) => { const c = getCase(id); c.expiry = proposeExpiry(c); save(); await audit('vencimiento_propuesto', id, c.expiry.why); route(); };
@@ -523,7 +582,7 @@ async function vVerificar() {
 }
 window.verifyFile = async (f) => {
   if (!f) return; $('#vf').innerHTML = '<p><span class="spin"></span> Calculando…</p>';
-  const h = await sha256Hex(await f.arrayBuffer());
+  const h = await sha256File(f);
   const hits = []; for (const c of DB.cases) { c.captures.forEach(x => x.sha256 === h && hits.push([c, x])); c.promos.forEach(x => x.sha256 === h && hits.push([c, x])); }
   $('#vf').innerHTML = `<div class="mono">${h}</div>` + (hits.length ? hits.map(([c, x]) => `<div class="verdict ok">✔ Coincide con ${esc(c.num)} · ${esc(x.name || x.file)} · sellado ${fmt(x.tsa && x.tsa.genTime)}</div>`).join('') : '<div class="verdict bad">✖ No coincide con ninguna captura registrada (o el archivo fue modificado).</div>');
 };
@@ -550,6 +609,19 @@ async function vAuditoria() {
 }
 
 /* --- Demo --- */
+async function demoCapture(m, pay) {
+  try {
+    const cv = document.createElement('canvas'); cv.width = 640; cv.height = 360; const g = cv.getContext('2d');
+    g.fillStyle = '#1f6b34'; g.fillRect(0, 0, 640, 360); g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 3;
+    g.strokeRect(20, 20, 600, 320); g.beginPath(); g.moveTo(320, 20); g.lineTo(320, 340); g.stroke(); g.beginPath(); g.arc(320, 180, 50, 0, 2 * Math.PI); g.stroke();
+    g.fillStyle = 'rgba(0,0,0,.65)'; g.fillRect(0, 0, 640, 44); g.fillRect(0, 316, 640, 44);
+    g.fillStyle = '#fff'; g.font = 'bold 18px sans-serif'; g.fillText(`${m.home} 0 - 0 ${m.away} · EN VIVO`, 16, 29);
+    g.font = '14px monospace'; g.fillText(`CAPTURA DE DEMOSTRACIÓN · ${new Date().toISOString()}`, 16, 343);
+    g.fillStyle = 'rgba(255,255,255,.18)'; g.font = 'bold 22px monospace'; g.fillText(pay, 150, 250);
+    const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+    return blob ? new File([blob], 'captura-demo.png', { type: 'image/png', lastModified: Date.now() }) : null;
+  } catch { return null; }
+}
 window.loadDemo = async () => {
   const m = { id: 'm-demo-' + uid(), home: 'Boca Juniors', away: 'River Plate', kickoff: new Date(Date.now() - 35 * 60e3).toISOString(), league: 'Liga Profesional de Fútbol', source: 'demo' };
   DB.matches.push(m);
@@ -569,7 +641,14 @@ window.loadDemo = async () => {
     analysisTsa: null, watermark: null, captures: [], promos: [{ platform: 'Telegram', url: 'https://t.me/futbol_gratis_demo/1234', account: 'Fútbol Gratis HD (demo)', reach: '48.000', addedAt: new Date().toISOString() }, { platform: 'X', url: 'https://x.com/demo_futbol/status/1', account: '@demo_futbol', reach: '12.300', addedAt: new Date().toISOString() }], expiry: null, seal: null };
   c.analysis.reportSha256 = await sha256Hex(stable(c.analysis));
   DB.cases.push(c); c.watermark = await checkWatermark(c, pay); c.expiry = proposeExpiry(c); save();
-  await audit('demo_cargada', c.id, c.num); location.hash = '#/exp/' + c.id;
+  await audit('demo_cargada', c.id, c.num);
+  const f = await demoCapture(m, pay);
+  if (f) {
+    const hash = await sha256File(f);
+    c.captures.push({ name: f.name, size: f.size, type: f.type, lastModified: new Date(f.lastModified).toISOString(), addedAt: new Date().toISOString(), sha256: hash, thumb: await thumbOf(f), tsa: await stamp(hash) }); save();
+    await audit('captura_agregada', c.id, `${f.name} sha256=${hash}`);
+  }
+  location.hash = '#/exp/' + c.id;
 };
 
 /* ===== Inicio ===== */
