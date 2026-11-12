@@ -19,7 +19,7 @@ async function remoteAudit(accion, expediente_id, detalle) { if (sb && SESSION) 
 async function publishRemote(c) {
   if (!sb || !SESSION || c.remoteId || c.estado !== 'en_cola_juez') return;
   if (!c.seal || !realTsa(c.seal.tsa)) return toast('Falta el sello de tiempo: reintentá el sello y después publicá');
-  if (c.captures.some(x => x.tsa && x.tsa.demo)) return toast('Hay capturas con sello simulado (DEMO): reintentá esos sellos antes de publicar');
+  if ([c.analysisTsa, ...c.captures.map(x => x.tsa), ...c.promos.map(p => p.tsa)].some(t => t && t.demo)) return toast('Hay sellos simulados (DEMO): reintentá esos sellos antes de publicar');
   const dh = c.analysis && c.analysis.deliveryHost;
   const { data, error } = await sb.from('expedientes').insert({ numero: c.num + '-' + c.id.slice(0, 4), partido: c.match, kickoff: c.match.kickoff, jurisdiccion: caseJur(c), objetivo: hostOf(c.target), host_video: dh || null, estado: 'en_cola_juez', consenso: c.consensus, contenido: sealPayload(c), sha256: c.seal.sha256, tsa: c.seal.tsa || null, reportado_por: SESSION.user.id }).select('id').single();
   if (error) return toast('No se pudo publicar: ' + error.message);

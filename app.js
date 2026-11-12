@@ -400,7 +400,7 @@ async function vExp(id) {
    <h3>Infraestructura y riesgo colateral (punto 3)</h3>${a.hosts.sort((x, y) => (y.host === a.deliveryHost) - (x.host === a.deliveryHost)).map(h => hostCard(h, h.host === a.deliveryHost)).join('')}
    ${a.rdap.length ? `<h3>Registro de dominio (RDAP)</h3><div class="tbl"><table><tr><th>Dominio</th><th>Registrador</th><th>Abuso</th><th>Alta</th><th>Vence</th></tr>${a.rdap.map(r => `<tr><td class="mono">${esc(r.domain)}</td><td>${esc(r.registrar || '—')}</td><td class="mono">${esc(r.abuse || '—')}</td><td>${fmtD(r.created)}</td><td>${fmtD(r.expires)}</td></tr>`).join('')}</table></div>` : ''}
    <div class="small mut" style="margin-top:6px">Análisis ${fmt(a.startedAt)} · ${esc(a.analyzer)} · hash del informe <span class="mono">${esc(a.reportSha256)}</span></div>
-   ${tsaBox(c.analysisTsa, 'Sello del informe técnico')}` : ''}</div>
+   ${tsaBox(c.analysisTsa, 'Sello del informe técnico')}${!ro && c.analysisTsa && !realTsa(c.analysisTsa) ? `<div class="row noprint" style="margin-top:6px"><button class="ghost" onclick="restampReport('${c.id}')">Reintentar sello</button></div>` : ''}` : ''}</div>
 
   <div class="card step ${c.captures.length ? (c.captures.every(x => realTsa(x.tsa)) ? 'done' : 'warn') : ''}"><div class="fig">PASO 4.0</div><h2>Capturas: hashes y sellos de tiempo</h2>
   <p class="small mut">El archivo no sale de tu teléfono: el SHA-256 se calcula localmente y solo el hash viaja a la autoridad de sellado (RFC 3161: FreeTSA y, si no responde, Sectigo). Guardá el archivo original: cualquier alteración cambia el hash.</p>
@@ -491,6 +491,7 @@ window.restampSeal = async (id) => {
   if (realTsa(c.seal.tsa)) await audit('expediente_sellado', id, `v${c.version} sha256=${c.seal.sha256} (sello reintentado)`);
   route();
 };
+window.restampReport = async (id) => { const c = getCase(id); c.analysisTsa = await stampFor(c, c.analysis.reportSha256); save(); route(); };
 window.restamp = async (id, i) => { const c = getCase(id); c.captures[i].tsa = await stampFor(c, c.captures[i].sha256); save(); route(); };
 window.dlTsr = (id, i) => { const c = getCase(id), x = c.captures[i]; if (!x.tsa || !x.tsa.tsr) return toast('Este sello no tiene .tsr (simulado o fallido)'); download(`${c.num}_${x.sha256.slice(0, 12)}.tsr`, b64ToBlob(x.tsa.tsr, 'application/timestamp-reply')); };
 window.dlSealTsr = (id) => { const c = getCase(id); if (!c.seal.tsa || !c.seal.tsa.tsr) return toast('Este sello no tiene .tsr (simulado o fallido)'); download(`${c.num}_v${c.version}_sello.tsr`, b64ToBlob(c.seal.tsa.tsr, 'application/timestamp-reply')); };
