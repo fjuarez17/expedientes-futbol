@@ -161,8 +161,9 @@ function proposeExpiry(c) {
 function score(c) {
   const dh = c.analysis && c.analysis.hosts && c.analysis.hosts.find(h => h.host === c.analysis.deliveryHost);
   const items = [
-    ['Marca de agua verificada (partido + licenciatario + dominio no autorizado)', 25, c.watermark && c.watermark.verdict === 'ok'],
-    ['Servidor de video identificado (host + IP)', 20, !!(dh && dh.a.length)],
+    ['Página analizada (host, IP y ASN)', 10, !!(c.analysis && c.analysis.hosts && c.analysis.hosts.some(h => h.a && h.a.length))],
+    ['Marca de agua verificada (partido + licenciatario + dominio no autorizado)', 20, c.watermark && c.watermark.verdict === 'ok'],
+    ['Servidor de video identificado (host + IP)', 15, !!(dh && dh.a.length)],
     ['Proveedor (ASN) identificado', 10, !!(dh && dh.ips[0] && dh.ips[0].asn)],
     ['Riesgo colateral evaluado', 10, !!(dh && dh.collateral)],
     ['Capturas con hash SHA-256', 10, c.captures.length > 0],
@@ -324,6 +325,7 @@ async function vExp(id) {
   return `<div class="row sp"><h1>${esc(c.num)} ${c.demo ? '<span class="pill warn">DEMO</span>' : ''}</h1><div class="row noprint"><button onclick="downloadPdf('${esc(c.num)}_v${c.version}')">Descargar informe PDF</button><button class="ghost" onclick="window.print()">Imprimir</button><button class="ghost" onclick="exportCase('${c.id}')">JSON</button></div></div>
   <div class="card"><div class="row sp"><div><b>${esc(matchName(c.match))}</b><div class="small mut">${esc(c.match.league || '')} · ${fmt(c.match.kickoff)}${c.match.venue ? ' · ' + esc(c.match.venue) : ''}</div></div>${c.seal ? '<span class="pill ok">Sellado v' + c.version + '</span>' : '<span class="pill warn">Borrador v' + c.version + '</span>'}</div>
   <table style="margin-top:8px"><tr><th>Enlace pirata</th><td class="mono">${esc(c.target)}</td></tr><tr><th>Creado</th><td>${fmt(c.createdAt)}</td></tr>${c.notes ? `<tr><th>Notas</th><td>${esc(c.notes)}</td></tr>` : ''}</table>
+  ${a ? `<div class="verdict ${dh ? 'bad' : 'warn'}" style="margin-top:10px"><b>Resultado del análisis</b> (${fmt(a.finishedAt || a.startedAt)})<br>${a.hosts.map(h => `<span class="mono">${esc(h.host)}</span> · ${esc((h.a || []).join(', ') || 'sin IP')}${h.ips && h.ips[0] ? ` · AS${esc(h.ips[0].asn)} ${esc(h.ips[0].holder || '')}` : ''}`).join('<br>')}<br>${dh ? `Video entregado por <span class="mono">${esc(dh.host)}</span>` : 'No se encontró reproductor ni video en esta página. Si lo tenés, pegá la URL del video (.m3u8) en el paso 2.0 y volvé a analizar.'}</div>` : `<div class="verdict warn noprint" style="margin-top:10px">Todavía no se analizó: tocá «Analizar» en el paso 2.0.</div>`}
   <h3>Solidez del expediente: ${s.pct}%</h3><div class="bar"><i style="width:${s.pct}%"></i></div>
   <ul class="check small">${s.items.map(([t, w, ok]) => `<li>${ok ? '<i class="ck y"></i>' : '<i class="ck"></i>'} ${esc(t)} <span class="mut">(${w})</span></li>`).join('')}</ul>
   ${rein.length ? `<div class="verdict warn">⚠ Reincidencia detectada: ${rein.map(r => `${esc(r.type)} ${esc(r.key)} en ${r.n} exp.`).join(' · ')}</div>` : ''}</div>
@@ -507,12 +509,24 @@ window.downloadPdf = async (nombre) => {
   if (typeof html2pdf === 'undefined') return window.print();
   toast('Generando PDF…');
   document.body.classList.add('pdf');
+  let blob;
   try {
-    await html2pdf().set({ margin: 10, filename: nombre + '.pdf', image: { type: 'jpeg', quality: 0.95 },
+    blob = await html2pdf().set({ margin: 10, image: { type: 'jpeg', quality: 0.95 },
       html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true }, jsPDF: { unit: 'mm', format: 'a4' },
-      pagebreak: { mode: ['css', 'legacy'], avoid: '.card' } }).from($('#app')).save();
-    await audit('informe_pdf', null, nombre);
-  } finally { document.body.classList.remove('pdf'); }
+      pagebreak: { mode: ['css', 'legacy'], avoid: '.card' } }).from($('#app')).outputPdf('blob');
+  } catch (e) { toast('No se pudo generar el PDF: ' + e.message); return; }
+  finally { document.body.classList.remove('pdf'); }
+  const file = nombre + '.pdf', url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+  const a = document.createElement('a'); a.href = url; a.download = file; document.body.appendChild(a); a.click(); a.remove();
+  let box = $('#pdfBox'); if (!box) { box = document.createElement('div'); box.id = 'pdfBox'; document.body.appendChild(box); }
+  box.innerHTML = `<b>Informe listo</b><span class="small">${esc(file)}</span><div class="row"><a class="btn" href="${url}" download="${esc(file)}">Descargar</a><a class="btn" href="${url}" target="_blank" rel="noopener">Abrir</a>${navigator.canShare ? '<button onclick="sharePdf()">Compartir</button>' : ''}<button class="ghost" onclick="this.closest(\'#pdfBox\').remove()">Cerrar</button></div>`;
+  window._pdf = { blob, file };
+  await audit('informe_pdf', null, nombre);
+};
+window.sharePdf = async () => {
+  const f = new File([window._pdf.blob], window._pdf.file, { type: 'application/pdf' });
+  if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f], title: window._pdf.file }); } catch {} }
+  else toast('Este navegador no permite compartir archivos: usá «Abrir»');
 };
 window.exportCase = (id) => { const c = getCase(id); download(`${c.num}_v${c.version}.json`, JSON.stringify({ format: 'expedientes-futbol/1', exportedAt: new Date().toISOString(), case: c, audit: DB.audit.filter(e => e.caseId === id) }, null, 1)); };
 window.exportAll = () => download(`expedientes_${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ format: 'expedientes-futbol-db/1', exportedAt: new Date().toISOString(), db: DB }, null, 1));
