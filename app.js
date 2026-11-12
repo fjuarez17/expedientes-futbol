@@ -38,7 +38,7 @@ const SEED_LIC = [
 const DB_KEY = 'xf_db_v1';
 let DB = load();
 function load() {
-  try { const d = JSON.parse(localStorage.getItem(DB_KEY)); if (d && d.cases) return d; } catch {}
+  try { const d = JSON.parse(localStorage.getItem(DB_KEY)); if (d && d.cases) { d.cases = d.cases.filter(c => !c.demo); d.matches = d.matches.filter(m => m.source !== 'demo'); return d; } } catch {}
   return { matches: [], licensees: SEED_LIC.map(l => ({ ...l, id: uid() })), marks: [], cases: [], audit: [], seq: 0, flags: {} };
 }
 function save() { localStorage.setItem(DB_KEY, JSON.stringify(DB)); }
@@ -175,7 +175,7 @@ function score(c) {
 }
 
 /* ===== Router ===== */
-const routes = { panel: vPanel, partidos: vPartidos, expedientes: vExpedientes, exp: vExp, nuevo: vNuevo, conocimiento: vConocimiento, licencias: vLicencias, verificar: vVerificar, auditoria: vAuditoria };
+const routes = { panel: vPanel, partidos: vPartidos, expedientes: vExpedientes, exp: vExp, nuevo: vNuevo, conocimiento: vConocimiento, licencias: vLicencias, verificar: vVerificar, auditoria: vAuditoria, informe: vInforme };
 async function route() {
   const [path, qs] = (location.hash.slice(2) || 'panel').split('?');
   const [name, arg] = path.split('/');
@@ -212,7 +212,7 @@ function caseRow(c) {
   const s = score(c);
   const dh = c.analysis && c.analysis.deliveryHost;
   return `<a class="item" href="#/exp/${c.id}"><div class="row sp"><b>${esc(c.num)} · ${esc(hostOf(c.target))}</b><span>${estadoPill(c)} ${c.seal ? '<span class="pill ok">Sellado</span>' : '<span class="pill warn">Borrador</span>'}</span></div>
-  <div class="small mut">${esc(matchName(c.match))} · ${fmt(c.createdAt)}${dh ? ' · video: ' + esc(dh) : ''}${c.demo ? ' · DEMO' : ''}</div>
+  <div class="small mut">${esc(matchName(c.match))} · ${fmt(c.createdAt)}${dh ? ' · video: ' + esc(dh) : ''}${''}</div>
   <div class="bar" style="margin-top:6px"><i style="width:${s.pct}%"></i></div></a>`;
 }
 
@@ -232,7 +232,7 @@ async function vPanel() {
   </div>
   ${sec('Próximos partidos', upcoming.length ? matchTiles(upcoming) : '<p>Sin partidos próximos cargados. <a href="#/partidos">Agregar partido</a></p>')}
   <div class="card"><div class="row sp"><h2>Últimos expedientes</h2><a href="#/expedientes">Ver todos</a></div><div class="list">${cs.slice(-5).reverse().map(caseRow).join('') || '<p class="mut">Todavía no hay expedientes.</p>'}</div>
-  <div class="row"><button class="ghost" onclick="loadDemo()">Cargar expediente de demostración${DB.matches.some(x => x.source === 'manual') ? ' (con el último partido agregado)' : ''}</button>${cs.some(c => c.demo) ? '<button class="ghost" onclick="clearDemo()">Borrar datos de demostración</button>' : ''}</div></div>
+  <div class="row"><a class="btn" href="#/nuevo">+ Nuevo expediente</a><a class="btn" href="#/informe">Informe general (PDF)</a></div></div>
   <section class="sec"><h3 class="lbl">Cómo funciona</h3><div class="prose"><b>Así se arma un expediente.</b> Elegís el partido, pegás el enlace pirata y la plataforma sigue la cadena página → reproductor embebido → manifiesto de video → segmentos, para llegar al servidor que realmente entrega el video (host, IP, ASN). Evalúa cuántos sitios comparten esa IP, verifica la marca de agua forense contra el partido y el licenciatario, calcula hashes SHA-256 y pide sellos de tiempo RFC 3161 a una autoridad externa. Cada acción queda en un registro de auditoría encadenado por hash.</div></section>`;
 }
 
@@ -462,6 +462,45 @@ window.reopen = async (id) => {
   c.version++; c.seal = null; save(); await audit('nueva_version', id, `v${c.version}`); route();
 };
 window.delCase = async (id) => { if (!confirm('¿Eliminar expediente? Queda registrado en auditoría.')) return; const c = getCase(id); DB.cases = DB.cases.filter(x => x.id !== id); save(); await audit('expediente_eliminado', id, c.num); go('#/expedientes'); };
+const ESTADO_TXT = { en_cola_juez: 'En cola del juez', revision_humana: 'Revisión humana', firmado: 'Firmado por el juez', rechazado: 'Rechazado', anexado: 'Anexado' };
+async function vInforme(_, qs) {
+  const sel = qs.get('match') || '';
+  const ms = allMatches().filter(m => DB.cases.some(c => c.match.id === m.id) || m.source === 'manual');
+  const cs = DB.cases.filter(c => !sel || c.match.id === sel);
+  const orders = (DB.orders || []).filter(o => cs.some(c => c.id === o.caseId));
+  const claims = (DB.claims || []).filter(r => !r.orderId || orders.some(o => o.id === r.orderId));
+  const au = await verifyAudit();
+  const ahora = new Date().toISOString();
+  const resumen = { generado: ahora, partido: sel || 'todos', expedientes: cs.map(c => [c.num, c.version, c.seal ? c.seal.sha256 : null]), ordenes: orders.length, auditoria: DB.audit.length ? DB.audit[DB.audit.length - 1].hash : null };
+  const hash = await sha256Hex(stable(resumen));
+  const fila = (k, v) => v ? `<tr><th>${esc(k)}</th><td>${v}</td></tr>` : '';
+  const card = (c) => {
+    const a = c.analysis, dh = a && a.hosts.find(h => h.host === a.deliveryHost), ip = dh && dh.ips && dh.ips[0];
+    const wm = c.watermark, sg = c.signature, cons = c.consensus;
+    return `<div class="card"><div class="row sp"><h2>${esc(c.num)} <span class="small mut">v${c.version}</span></h2><span class="pill ${c.estado === 'firmado' ? 'ok' : 'warn'}">${esc(ESTADO_TXT[c.estado] || (c.seal ? 'Sellado' : 'Borrador'))}</span></div>
+    <table>${fila('Partido', esc(matchName(c.match)) + ' · ' + fmt(c.match.kickoff))}${fila('Enlace pirata', `<span class="mono">${esc(c.target)}</span>`)}${fila('Detectado', fmt(c.createdAt) + (c.notes ? ' · ' + esc(c.notes) : ''))}
+    ${fila('Video entregado por', dh ? `<span class="mono">${esc(dh.host)}</span> · ${esc((dh.a || []).join(', '))}${ip ? ` · AS${esc(ip.asn)} ${esc(ip.holder || '')} (${esc(ip.country || '')})` : ''}` : '<span class="mut">sin análisis técnico</span>')}
+    ${fila('Riesgo colateral', dh && dh.collateral ? `${esc(dh.collateral.level)} → ${dh.collateral.recommendation === 'bloquear_dominio' ? 'bloquear por dominio' : 'bloquear por IP y dominio'}. ${esc(dh.collateral.reason || '')}` : '')}
+    ${fila('Marca de agua', wm ? `${wm.verdict === 'ok' ? '✔ señal oficial redistribuida sin autorización' : '✖ no valida'} · <span class="mono">${esc(wm.payload)}</span>${wm.licensee ? ' · ' + esc(wm.licensee.name) : ''}` : '<span class="mut">sin verificar</span>')}
+    ${fila('Oráculo', cons ? `${cons.ok ? '✔ consenso' : '✖ sin consenso'} · ${cons.checks.map(x => (x.ok ? '✔ ' : '✖ ') + esc(x.k)).join(' · ')}` : '<span class="mut">no corrido</span>')}
+    ${fila('Promoción', (c.promos || []).map(p => `${esc(p.platform)} ${esc(p.account || '')}`).join(' · '))}
+    ${fila('Capturas', (c.captures || []).length ? `${c.captures.length} con SHA-256` : '')}
+    ${fila('Sello', c.seal ? `<span class="mono">sha256 ${esc(c.seal.sha256)}</span>${c.seal.tsa && c.seal.tsa.genTime ? ' · TSA ' + fmt(c.seal.tsa.genTime) : ''}` : '<span class="mut">sin sellar</span>')}
+    ${fila('Decisión judicial', sg ? `Firmado por ${esc(sg.juez)} (${esc(sg.juzgado)}) · ${fmt(sg.ts)} · ${esc(sg.alg)}` : c.rejection ? `Rechazado por ${esc(c.rejection.juez)}: ${esc(c.rejection.why)}` : '')}
+    ${fila('Vencimiento propuesto', c.expiry ? `${esc(c.expiry.why)}<br>${c.expiry.items.map(it => `${esc(it.target)} · ${esc(it.method)} · hasta ${it.until ? fmt(it.until) : '—'}`).join('<br>')}` : '')}</table></div>`;
+  };
+  return `${hero('Informe general', 'de todo lo relevado: expedientes, servidores de video, oráculo, decisión judicial, órdenes y auditoría.')}
+  <div class="card noprint"><div class="row"><select id="iMatch" onchange="go('#/informe?match='+encodeURIComponent(this.value))"><option value="">Todos los partidos</option>${ms.map(m => `<option value="${esc(m.id)}" ${m.id === sel ? 'selected' : ''}>${esc(matchName(m))} · ${fmtD(m.kickoff)}</option>`).join('')}</select>
+  <button onclick="downloadPdf('informe_${sel ? 'partido' : 'general'}_${ahora.slice(0, 10)}')" ${cs.length ? '' : 'disabled'}>Descargar informe PDF</button></div>
+  ${cs.length ? '' : '<p class="mut">Todavía no hay expedientes. <a href="#/partidos">Agregá tu partido</a> y después pegá el enlace en <a href="#/nuevo">Nuevo expediente</a>.</p>'}</div>
+  <div class="card"><table>${fila('Generado', fmt(ahora))}${fila('Alcance', sel ? esc(matchName(matchById(sel))) : 'Todos los partidos')}${fila('Huella del informe', `<span class="mono">sha256 ${hash}</span>`)}</table>
+  <div class="grid" style="margin-top:10px"><div class="kpi"><b>${cs.length}</b><span>Expedientes</span></div><div class="kpi"><b>${cs.filter(c => c.seal).length}</b><span>Sellados</span></div><div class="kpi"><b>${cs.filter(c => c.estado === 'firmado').length}</b><span>Firmados</span></div><div class="kpi"><b>${orders.length}</b><span>Órdenes</span></div><div class="kpi"><b>${claims.length}</b><span>Reclamos</span></div></div></div>
+  ${cs.map(card).join('')}
+  ${orders.length ? `<div class="card"><h2>Órdenes de bloqueo</h2><table><tr><th>Orden</th><th>Expediente</th><th>Objetivo</th><th>Tipo</th><th>Hasta</th><th>Estado</th></tr>${orders.map(o => `<tr><td>${esc(o.num)}</td><td>${esc(o.caseNum || '')}</td><td class="mono">${esc(o.objetivo)}</td><td>${esc(o.tipo)}</td><td>${o.hasta ? fmt(o.hasta) : '—'}</td><td>${esc(o.estado)}</td></tr>`).join('')}</table></div>` : ''}
+  ${claims.length ? `<div class="card"><h2>Reclamos</h2><table><tr><th>Dominio</th><th>Motivo</th><th>Fecha</th><th>Estado</th></tr>${claims.map(r => `<tr><td class="mono">${esc(r.dominio)}</td><td>${esc(r.motivo)}</td><td>${fmt(r.at)}</td><td>${esc(r.estado)}</td></tr>`).join('')}</table></div>` : ''}
+  <div class="card"><h2>Auditoría</h2><div class="verdict ${au.ok ? 'ok' : 'bad'}">${au.ok ? `✔ Cadena íntegra: ${au.n} registros encadenados por SHA-256` : `✖ ${esc(au.why)} en el registro ${au.at}`}</div>
+  <table>${DB.audit.filter(e => !sel || !e.caseId || cs.some(c => c.id === e.caseId)).slice(-40).map(e => `<tr><td>${fmt(e.ts)}</td><td>${esc(e.action)}</td><td class="small">${esc(e.detail)}</td></tr>`).join('')}</table></div>`;
+}
 window.downloadPdf = async (nombre) => {
   if (typeof html2pdf === 'undefined') return window.print();
   toast('Generando PDF…');
@@ -561,35 +600,6 @@ async function vAuditoria() {
 }
 
 /* --- Demo --- */
-window.clearDemo = async () => {
-  if (!confirm('¿Borrar los expedientes y partidos de demostración? Queda registrado en auditoría.')) return;
-  const n = DB.cases.filter(c => c.demo).length;
-  DB.cases = DB.cases.filter(c => !c.demo); DB.matches = DB.matches.filter(m => m.source !== 'demo');
-  save(); await audit('demo_borrada', null, `${n} expediente(s)`); toast('Datos de demostración borrados'); route();
-};
-window.loadDemo = async () => {
-  const propio = DB.matches.filter(x => x.source === 'manual').slice(-1)[0];
-  const m = propio || { id: 'm-demo-' + uid(), home: 'Boca Juniors', away: 'River Plate', kickoff: new Date(Date.now() - 35 * 60e3).toISOString(), league: 'Liga Profesional de Fútbol', source: 'demo' };
-  if (!propio) DB.matches.push(m);
-  const pay = await makePayload(m.id, 'ESP', '4F1C09A2');
-  if (!DB.marks.some(k => k.payload === pay)) DB.marks.push({ payload: pay, session: '4F1C09A2', note: 'decodificador #4471 (demo)' });
-  DB.seq++;
-  const c = { id: uid(), demo: true, num: `EXP-${new Date().getFullYear()}-${String(DB.seq).padStart(4, '0')}`, createdAt: new Date().toISOString(), version: 1,
-    match: { id: m.id, home: m.home, away: m.away, kickoff: m.kickoff, league: m.league || 'Liga Profesional de Fútbol' }, target: 'https://futbol-gratis-demo.example/en-vivo/espn-premium', videoUrl: null, notes: 'Caso ficticio de demostración (datos de documentación RFC 5737).',
-    analysis: { target: 'https://futbol-gratis-demo.example/en-vivo/espn-premium', startedAt: new Date().toISOString(), analyzer: 'demo', deliveryHost: 'edge7.live-cdn-demo.example', notes: [], rdap: [{ domain: 'futbol-gratis-demo.example', registrar: 'Registrador Demo', abuse: 'abuse@registrador.example', created: '2025-03-01T00:00:00Z', expires: '2027-03-01T00:00:00Z' }],
-      chain: [{ url: 'https://futbol-gratis-demo.example/en-vivo/espn-premium', depth: 0, status: 200, title: 'ESPN Premium EN VIVO gratis', sha256: 'demo' }, { url: 'https://player-demo.example/embed/espn1', depth: 1, status: 200 }],
-      video: [{ url: 'https://edge7.live-cdn-demo.example/hls/espn1/index.m3u8', type: 'HLS (m3u8)', status: 200, segments: ['https://edge7.live-cdn-demo.example/hls/espn1/seg_10233.ts'] }],
-      hosts: [
-        { host: 'futbol-gratis-demo.example', roles: ['pagina'], a: ['192.0.2.10'], aaaa: [], cname: [], ips: [{ ip: '192.0.2.10', asn: 13335, holder: 'CLOUDFLARENET - Cloudflare, Inc.', kind: 'cdn', kindLabel: 'Cloudflare', country: 'US' }], cdnHeader: 'Cloudflare', reverse: { ok: true, count: 500, domains: ['(muestra)'] }, collateral: { level: 'alto', recommendation: 'bloquear_dominio', reason: 'La IP pertenece a una CDN (Cloudflare); bloquearla afectaría a miles de sitios legítimos.' } },
-        { host: 'player-demo.example', roles: ['embed'], a: ['198.51.100.20'], aaaa: [], cname: [], ips: [{ ip: '198.51.100.20', asn: 16276, holder: 'OVH SAS', kind: 'hosting', kindLabel: 'OVHcloud', country: 'FR' }], reverse: null, collateral: { level: 'sin datos', recommendation: 'bloquear_dominio', reason: 'No se pudo determinar cuántos sitios comparten la IP: por prudencia, bloquear por dominio.' } },
-        { host: 'edge7.live-cdn-demo.example', roles: ['manifiesto', 'segmentos'], a: ['203.0.113.77'], aaaa: [], cname: [], ips: [{ ip: '203.0.113.77', asn: 202425, holder: 'IP Volume inc', kind: 'hosting', kindLabel: 'IP Volume', country: 'NL', prefix: '203.0.113.0/24' }], reverse: { ok: true, count: 1, domains: ['edge7.live-cdn-demo.example'] }, collateral: { level: 'bajo', recommendation: 'bloquear_ip_y_dominio', reason: 'La IP aloja 1 dominio(s): servidor dedicado, bloqueo por IP con bajo riesgo colateral.' } },
-      ] },
-    analysisTsa: null, watermark: null, captures: [], promos: [{ platform: 'Telegram', url: 'https://t.me/futbol_gratis_demo/1234', account: 'Fútbol Gratis HD (demo)', reach: '48.000', addedAt: new Date().toISOString() }, { platform: 'X', url: 'https://x.com/demo_futbol/status/1', account: '@demo_futbol', reach: '12.300', addedAt: new Date().toISOString() }], expiry: null, seal: null };
-  c.analysis.reportSha256 = await sha256Hex(stable(c.analysis));
-  DB.cases.push(c); c.watermark = await checkWatermark(c, pay); c.expiry = proposeExpiry(c); save();
-  await audit('demo_cargada', c.id, c.num); location.hash = '#/exp/' + c.id;
-};
-
 /* ===== Inicio ===== */
 $('#menuBtn').onclick = () => document.body.classList.toggle('menu');
 $('#nav').addEventListener('click', (e) => { if (e.target.closest('a')) document.body.classList.remove('menu'); });
