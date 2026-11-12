@@ -346,6 +346,9 @@ class Plataforma:
                              proveedor=envio["proveedor"], orden_id=orden["orden_id"], tipo=orden["tipo"],
                              objetivo=orden["objetivo"], vence_min=orden["vence_min"], firmado_por=orden["juez_id"],
                              http=cod, respuesta=resp)
+        if cod == 0 or cod >= 500:
+            intento["estado"] = envio["estado"] = "fallida"
+            self.reintentar(t, envio)
 
     def reintentar(self, t: dict, envio: dict) -> None:
         firmante = envio["intentos"][-1]["firmado_por"]
