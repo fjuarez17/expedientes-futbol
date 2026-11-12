@@ -516,13 +516,15 @@ window.downloadPdf = async (nombre) => {
       pagebreak: { mode: ['css', 'legacy'], avoid: '.card' } }).from($('#app')).outputPdf('blob');
   } catch (e) { toast('No se pudo generar el PDF: ' + e.message); return; }
   finally { document.body.classList.remove('pdf'); }
+  if (window._pdf) URL.revokeObjectURL(window._pdf.url);
   const file = nombre + '.pdf', url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
   const a = document.createElement('a'); a.href = url; a.download = file; document.body.appendChild(a); a.click(); a.remove();
   let box = $('#pdfBox'); if (!box) { box = document.createElement('div'); box.id = 'pdfBox'; document.body.appendChild(box); }
-  box.innerHTML = `<b>Informe listo</b><span class="small">${esc(file)}</span><div class="row"><a class="btn" href="${url}" download="${esc(file)}">Descargar</a><a class="btn" href="${url}" target="_blank" rel="noopener">Abrir</a>${navigator.canShare ? '<button onclick="sharePdf()">Compartir</button>' : ''}<button class="ghost" onclick="this.closest(\'#pdfBox\').remove()">Cerrar</button></div>`;
-  window._pdf = { blob, file };
+  box.innerHTML = `<b>Informe listo</b><span class="small">${esc(file)}</span><div class="row"><a class="btn" href="${url}" download="${esc(file)}">Descargar</a><a class="btn" href="${url}" target="_blank" rel="noopener">Abrir</a>${navigator.canShare ? '<button onclick="sharePdf()">Compartir</button>' : ''}<button class="ghost" onclick="closePdf()">Cerrar</button></div>`;
+  window._pdf = { blob, file, url };
   await audit('informe_pdf', null, nombre);
 };
+window.closePdf = () => { $('#pdfBox')?.remove(); if (window._pdf) URL.revokeObjectURL(window._pdf.url); window._pdf = null; };
 window.sharePdf = async () => {
   const f = new File([window._pdf.blob], window._pdf.file, { type: 'application/pdf' });
   if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f], title: window._pdf.file }); } catch {} }
