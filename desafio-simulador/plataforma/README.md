@@ -52,6 +52,8 @@ Si Supabase se corta, el motor sigue enviando y confirmando órdenes y reintenta
 
 Prueba sin la app, con un juez automático que usa la clave anon y la RLS igual que el navegador:
 `python pruebas/juez_supabase.py --supabase-url <url> --anon <clave-anon>`.
+Con `--sin-reclamos` firma los expedientes y deja los reclamos para resolverlos desde la app (Juez → Reclamos → «Aceptar y levantar»):
+el motor levanta la orden en cada proveedor y la reemplaza por un bloqueo por dominio.
 
 ## Qué hace
 

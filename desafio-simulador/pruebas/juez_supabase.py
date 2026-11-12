@@ -37,7 +37,7 @@ class Juez:
         except urllib.error.HTTPError as e:
             return {"error": e.code, "detalle": e.read().decode()[:200]}
 
-    def trabajar(self):
+    def trabajar(self, reclamos=True):
         cola = self.req("GET", "/rest/v1/expedientes?estado=eq.en_cola_juez&select=id,numero,sha256,contenido")
         for e in cola if isinstance(cola, list) else []:
             calc = hashlib.sha256(estable(e["contenido"]).encode()).hexdigest()
@@ -53,6 +53,8 @@ class Juez:
             self.req("POST", "/rest/v1/auditoria", {"accion": "firma", "expediente_id": e["id"],
                                                     "detalle": f"{e['numero']} firmado por {self.usuario}"})
             print(self.usuario, "firmó", e["numero"], flush=True)
+        if not reclamos:
+            return
         recs = self.req("GET", "/rest/v1/reclamos?estado=eq.pendiente&rec_sim_id=not.is.null&select=id,rec_sim_id,verificacion")
         for r in recs if isinstance(recs, list) else []:
             estado = "aceptado" if (r["verificacion"] or {}).get("valido") else "rechazado"
@@ -67,17 +69,18 @@ def main():
     a.add_argument("--anon", required=True)
     a.add_argument("--simulador", default="http://localhost:8080")
     a.add_argument("--demora", type=float, default=0.5, help="segundos reales antes de firmar")
+    a.add_argument("--sin-reclamos", action="store_true", help="deja los reclamos para resolver desde la app")
     args = a.parse_args()
     jueces = [Juez(args.supabase_url, args.anon, u) for u in ("laura", "martin")]
     while True:
         for j in jueces:
-            j.trabajar()
+            j.trabajar(not args.sin_reclamos)
         try:
             with urllib.request.urlopen(args.simulador + "/estado", timeout=5) as x:
                 if json.loads(x.read())["finalizado"]:
                     time.sleep(5)
                     for j in jueces:
-                        j.trabajar()
+                        j.trabajar(not args.sin_reclamos)
                     return
         except OSError:
             pass

@@ -489,8 +489,10 @@ class Plataforma:
                         if cod == 200:
                             it["estado"] = e["estado"] = "levantada"
                             levantadas.append(it["orden_id"])
-                    if tipo == "ip":
-                        host = exp["servidor"]["host_stream"]
+                    host = exp["servidor"]["host_stream"]
+                    ya = any(x["proveedor"] == e["proveedor"] and x["tipo"] == "dominio" and x["objetivo"] == host
+                             for x in t["envios"])
+                    if tipo == "ip" and not ya:
                         o = {"orden_id": self.nuevo_orden_id(), "expediente_id": exp_id, "tipo": "dominio",
                              "objetivo": host, "vence_min": exp["pedido"]["vence_min"],
                              "juzgado_id": juez["juzgado_id"], "juez_id": juez_id}

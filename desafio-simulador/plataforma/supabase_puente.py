@@ -241,6 +241,7 @@ class Puente:
                     if self.cache_ordenes.get(fila["numero"]) != clave:
                         self.cache_ordenes[fila["numero"]] = clave
                         filas.append(fila)
+        filas = list({f["numero"]: f for f in filas}.values())
         if filas:
             try:
                 self.sb.upsert("ordenes", normalizar(filas), "numero")
