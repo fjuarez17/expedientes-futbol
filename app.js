@@ -161,7 +161,7 @@ function proposeExpiry(c) {
 function score(c) {
   const dh = c.analysis && c.analysis.hosts && c.analysis.hosts.find(h => h.host === c.analysis.deliveryHost);
   const items = [
-    ['Página analizada (host, IP y ASN)', 10, !!(c.analysis && c.analysis.hosts && c.analysis.hosts.some(h => h.a && h.a.length))],
+    ['Página analizada (host, IP y ASN)', 10, !!(c.analysis && c.analysis.hosts && c.analysis.hosts.some(h => h.host === hostOf(c.target) && h.a && h.a.length))],
     ['Marca de agua verificada (partido + licenciatario + dominio no autorizado)', 20, c.watermark && c.watermark.verdict === 'ok'],
     ['Servidor de video identificado (host + IP)', 15, !!(dh && dh.a.length)],
     ['Proveedor (ASN) identificado', 10, !!(dh && dh.ips[0] && dh.ips[0].asn)],
