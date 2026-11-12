@@ -20,9 +20,11 @@ alter table reclamos add column if not exists verificacion jsonb;
 alter table reclamos add column if not exists decidido_por uuid references jueces(id);
 alter table reclamos add column if not exists decidido_at timestamptz;
 
--- El juez ve el estado de las órdenes en cada proveedor
+-- El juez ve el estado de las órdenes de su jurisdicción en cada proveedor
 drop policy if exists ordenes_lectura on ordenes;
-create policy ordenes_lectura on ordenes for select using (auth.uid() is not null);
+create policy ordenes_lectura on ordenes for select using (
+  exists (select 1 from expedientes e join turnos t on t.jurisdiccion = e.jurisdiccion
+          where e.id = ordenes.expediente_id and t.juez_id = auth.uid()));
 
 -- El juez de turno ve y resuelve los reclamos
 drop policy if exists reclamos_juez_lee on reclamos;
@@ -30,6 +32,7 @@ create policy reclamos_juez_lee on reclamos for select using (
   exists (select 1 from turnos t where t.juez_id = auth.uid() and now() between t.desde and t.hasta));
 drop policy if exists reclamos_juez_decide on reclamos;
 create policy reclamos_juez_decide on reclamos for update using (
+  estado = 'pendiente' and
   exists (select 1 from turnos t where t.juez_id = auth.uid() and now() between t.desde and t.hasta))
   with check (decidido_por = auth.uid() and estado in ('aceptado', 'rechazado'));
 
