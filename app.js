@@ -447,7 +447,7 @@ window.addPromo = async (id) => {
 };
 window.doExpiry = async (id) => { const c = getCase(id); c.expiry = proposeExpiry(c); save(); await audit('vencimiento_propuesto', id, c.expiry.why); route(); };
 window.setUntil = async (id, i, v) => { const c = getCase(id); c.expiry.items[i].until = new Date(v + 'T23:59:00-03:00').toISOString(); c.expiry.edited = true; save(); await audit('vencimiento_editado', id, `${c.expiry.items[i].target} → ${v}`); };
-function sealPayload(c) { const { seal, estado, signature, annexOf, rejection, ...rest } = c; const r = JSON.parse(JSON.stringify(rest)); r.captures.forEach(x => delete x.thumb); return r; }
+function sealPayload(c) { const { seal, estado, signature, annexOf, rejection, remoteId, ...rest } = c; const r = JSON.parse(JSON.stringify(rest)); r.captures.forEach(x => delete x.thumb); return r; }
 window.sealCase = async (id) => {
   const c = getCase(id);
   if (score(c).pct < 50 && !confirm('El expediente tiene solidez baja. ¿Sellar igual?')) return;

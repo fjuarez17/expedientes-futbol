@@ -140,6 +140,8 @@ Archivo `oraculo.js` (modo local) + `supabase/schema.sql` (modo multiusuario).
 - **Anexo dinámico**: un dominio nuevo con el mismo host de video o la misma sesión de marca de agua que un expediente ya firmado se anexa a ese expediente y suma una orden, en vez de abrir uno nuevo.
 - **Registro público** (`#/transparencia`): qué se bloqueó, tipo, juzgado, desde/hasta, estado (vigente / vencida / levantada por reclamo) y el hash de cabecera de la auditoría. Sin evidencia ni identidad de quien reportó. Botón “Mi sitio fue bloqueado por error” → reclamo que resuelve el juez de turno.
 
+**Modo compartido (Supabase, `supa.js`)** — ya conectado al proyecto. Con sesión iniciada (`#/acceso`): el reportante que corre el oráculo publica el expediente congelado en `expedientes` (estado `en_cola_juez`); el juez ve la cola en vivo (Realtime) solo si la RLS lo permite (turno activo + jurisdicción), firma (`firmas`) y se generan las `ordenes`; el registro público lee la vista `registro_publico` y `cabecera_auditoria` sin login; los reclamos van a `reclamos`. La auditoría remota se encadena con un trigger SHA-256. Las cuentas de jueces se crean desde el panel de Supabase (Auth + fila en `jueces` + `turnos`).
+
 **Falta para producción:** ejecutar `supabase/schema.sql`, login de jueces con Supabase Auth, mover los datos de `localStorage` a las tablas, Realtime para la cola y firma digital con certificado en lugar de la clave Ed25519 del MVP. En modo local el selector "Actuás como" reemplaza al login y los jueces y turnos cargados son de ejemplo.
 
 ---
