@@ -146,6 +146,7 @@ Celular (navegador)                         Vercel (funciones serverless)
 - **Frontend**: HTML + JS + CSS sin frameworks ni build. Todo en `app.js`.
 - **Backend**: 3 funciones Node 20 sin dependencias (`fetch` nativo). `api/_lib.js` tiene utilidades compartidas.
 - **Sellado RFC 3161**: `api/timestamp.js` arma el `TimeStampReq` en DER a mano (SHA-256, nonce aleatorio, `certReq=true`), lo manda a FreeTSA y devuelve el `.tsr` en base64, la hora (`genTime`) y si el hash aparece en el token.
+- **Diseño**: estética editorial inspirada en [Object — Football As Football](https://object.design/work/football-as-football/): fondo verde césped, tipografía grotesca grande (Plus Jakarta Sans), titulares blanco/negro, paneles negros tipo "figura" (`PASO 1.0`, `FIG 1.0`), menú a pantalla completa con ítems numerados y grilla de partidos con escudos en los colores de cada club (si la fuente no trae escudo, se dibuja uno con las iniciales).
 - **Protección SSRF**: antes de descargar cualquier URL se resuelve el DNS y se rechazan IPs privadas/loopback/link-local.
 - **Seguridad del contenido**: todo lo que viene de sitios piratas (títulos, URLs, dominios) se escapa antes de mostrarse.
 

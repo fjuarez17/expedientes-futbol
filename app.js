@@ -189,9 +189,23 @@ window.addEventListener('hashchange', route);
 const go = (h) => { if (location.hash === h) route(); else location.hash = h; };
 
 /* ===== Vistas ===== */
+const hero = (b, t) => `<section class="hero"><p><b>${esc(b)}</b> ${esc(t)}</p></section>`;
+const TEAM_COLORS = { 'Aldosivi': ['#00843D', '#FFD100'], 'Argentinos Juniors': ['#D7182A', '#FFFFFF'], 'Atlético Tucumán': ['#6CACE4', '#FFFFFF'], 'Banfield': ['#00703C', '#FFFFFF'], 'Barracas Central': ['#C8102E', '#FFFFFF'], 'Belgrano': ['#5BB4E5', '#0B2D6B'], 'Boca Juniors': ['#003C8F', '#FDB913'], 'Central Córdoba de Santiago del Estero': ['#111111', '#FFFFFF'], 'Defensa y Justicia': ['#00A651', '#FFE600'], 'Deportivo Riestra': ['#0A0A0A', '#FFFFFF'], 'Estudiantes de La Plata': ['#E30613', '#FFFFFF'], 'Estudiantes de Río Cuarto': ['#4FA3D9', '#FFFFFF'], 'Gimnasia y Esgrima de La Plata': ['#0B2D6B', '#FFFFFF'], 'Gimnasia y Esgrima de Mendoza': ['#1A1A1A', '#FFFFFF'], 'Huracán': ['#F2F2F2', '#E4002B'], 'Independiente': ['#D50032', '#FFFFFF'], 'Independiente Rivadavia': ['#0033A0', '#FFFFFF'], 'Instituto': ['#D52B1E', '#FFFFFF'], 'Lanús': ['#7A1F2B', '#FFFFFF'], "Newell's Old Boys": ['#CE1126', '#0A0A0A'], 'Platense': ['#5C3A21', '#FFFFFF'], 'Racing Club': ['#75AADB', '#FFFFFF'], 'River Plate': ['#FFFFFF', '#E30613'], 'Rosario Central': ['#003DA5', '#FFD700'], 'San Lorenzo': ['#002F6C', '#E4002B'], 'Sarmiento': ['#00843D', '#FFFFFF'], 'Talleres de Córdoba': ['#002855', '#FFFFFF'], 'Tigre': ['#003DA5', '#E4002B'], 'Unión de Santa Fe': ['#E4002B', '#FFFFFF'], 'Vélez Sarsfield': ['#FFFFFF', '#0033A0'] };
+const initials = (n) => (n || '?').replace(/de |y |Club|Atlético |Deportivo /g, '').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+function crest(team, badge) {
+  const [bg, ac] = TEAM_COLORS[team] || ['#1A1A1A', '#42A500'];
+  return `<div class="crest" style="--bg:${bg};--ac:${ac}">${badge ? `<img src="${esc(badge)}" alt="${esc(team)}" loading="lazy">` : `<svg viewBox="0 0 60 70" aria-hidden="true"><path d="M30 3 56 12v22c0 17-12 28-26 33C16 62 4 51 4 34V12z" fill="none" stroke="${ac}" stroke-width="3"/><text x="30" y="43" text-anchor="middle" font-size="19" font-weight="800" fill="${ac}">${esc(initials(team))}</text></svg>`}</div>`;
+}
+function matchTiles(list) {
+  return `<div class="tiles">${list.map((m, i) => {
+    const n = DB.cases.filter(c => c.match.id === m.id).length;
+    return `<a class="tile" href="#/nuevo?match=${encodeURIComponent(m.id)}"><div class="pair">${crest(m.home, m.homeBadge)}${crest(m.away, m.awayBadge)}</div><div class="tinfo"><span class="fig">FIG ${i + 1}.0</span><b>${esc(m.home)}</b><b>${esc(m.away)}</b><small>${fmt(m.kickoff)}</small>${n ? `<span class="pill warn">${n} exp.</span>` : ''}</div></a>`;
+  }).join('')}</div>`;
+}
+const sec = (label, html) => `<section class="sec"><h3 class="lbl">${esc(label)}</h3><div>${html}</div></section>`;
 function matchRow(m, extra = '') {
   const n = DB.cases.filter(c => c.match.id === m.id).length;
-  return `<div class="item"><div class="row sp"><div class="match">${m.homeBadge ? `<img src="${esc(m.homeBadge)}" alt="">` : ''}<div><b>${esc(matchName(m))}</b><div class="small mut">${fmt(m.kickoff)}${m.round ? ' · Fecha ' + esc(m.round) : ''}${m.venue ? ' · ' + esc(m.venue) : ''}${m.score ? ' · ' + esc(m.score) : ''}</div></div>${m.awayBadge ? `<img src="${esc(m.awayBadge)}" alt="">` : ''}</div>
+  return `<div class="item"><div class="row sp"><div class="match">${crest(m.home, m.homeBadge)}<div><b>${esc(matchName(m))}</b><div class="small mut">${fmt(m.kickoff)}${m.round ? ' · Fecha ' + esc(m.round) : ''}${m.venue ? ' · ' + esc(m.venue) : ''}${m.score ? ' · ' + esc(m.score) : ''}</div></div>${crest(m.away, m.awayBadge)}</div>
   <div class="row">${n ? `<span class="pill warn">${n} exp.</span>` : ''}<a class="btn" href="#/nuevo?match=${encodeURIComponent(m.id)}">+ Expediente</a>${extra}</div></div></div>`;
 }
 function caseRow(c) {
@@ -208,7 +222,7 @@ async function vPanel() {
   const now = Date.now();
   const upcoming = allMatches().filter(m => new Date(m.kickoff).getTime() > now - 3 * 3600e3).sort((a, b) => a.kickoff.localeCompare(b.kickoff)).slice(0, 4);
   const cdn = cs.filter(c => c.analysis && c.analysis.hosts.some(h => h.host === c.analysis.deliveryHost && h.collateral.recommendation === 'bloquear_dominio')).length;
-  return `<h1>Panel</h1>
+  return `${hero('Expedientes', 'arma la prueba contra cada stream pirata del fútbol argentino: señal oficial, servidor que entrega el video, riesgo colateral y evidencia sellada.')}
   <div class="grid">
     <div class="kpi"><b>${cs.length}</b><span>Expedientes</span></div>
     <div class="kpi"><b>${sealed}</b><span>Sellados</span></div>
@@ -216,15 +230,15 @@ async function vPanel() {
     <div class="kpi"><b>${k.asn.size}</b><span>Proveedores (ASN)</span></div>
     <div class="kpi"><b>${cdn}</b><span>Con IP en CDN/compartida → bloquear dominio</span></div>
   </div>
-  <div class="card" style="margin-top:12px"><h2>Próximos partidos</h2><div class="list">${upcoming.map(m => matchRow(m)).join('') || '<p class="mut">Sin partidos próximos cargados. <a href="#/partidos">Agregar partido</a></p>'}</div></div>
+  ${sec('Próximos partidos', upcoming.length ? matchTiles(upcoming) : '<p>Sin partidos próximos cargados. <a href="#/partidos">Agregar partido</a></p>')}
   <div class="card"><div class="row sp"><h2>Últimos expedientes</h2><a href="#/expedientes">Ver todos</a></div><div class="list">${cs.slice(-5).reverse().map(caseRow).join('') || '<p class="mut">Todavía no hay expedientes.</p>'}</div>
   ${cs.length ? '' : '<button class="ghost" onclick="loadDemo()">Cargar expediente de demostración</button>'}</div>
-  <div class="card small mut"><b>Cómo funciona:</b> elegís el partido, pegás el enlace pirata y la plataforma sigue la cadena página → reproductor embebido → manifiesto de video → segmentos, para llegar al servidor que realmente entrega el video (host, IP, ASN). Evalúa cuántos sitios comparten esa IP, verifica la marca de agua forense contra el partido y el licenciatario, calcula hashes SHA-256 y pide sellos de tiempo RFC 3161 a una autoridad externa. Cada acción queda en un registro de auditoría encadenado por hash.</div>`;
+  <section class="sec"><h3 class="lbl">Cómo funciona</h3><div class="prose"><b>Así se arma un expediente.</b> Elegís el partido, pegás el enlace pirata y la plataforma sigue la cadena página → reproductor embebido → manifiesto de video → segmentos, para llegar al servidor que realmente entrega el video (host, IP, ASN). Evalúa cuántos sitios comparten esa IP, verifica la marca de agua forense contra el partido y el licenciatario, calcula hashes SHA-256 y pide sellos de tiempo RFC 3161 a una autoridad externa. Cada acción queda en un registro de auditoría encadenado por hash.</div></section>`;
 }
 
 async function vPartidos() {
   const ms = allMatches();
-  return `<h1>Partidos</h1>
+  return `${hero('Partidos', 'de la Liga Profesional. Cada expediente queda atado a un partido concreto.')}
   <div class="card"><h2>Agregar partido</h2>
     <div class="grid"><div><label>Local</label><select id="mHome">${TEAMS.map(t => `<option>${esc(t)}</option>`).join('')}</select></div>
     <div><label>Visitante</label><select id="mAway">${TEAMS.map((t, i) => `<option ${i === 1 ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
@@ -245,7 +259,7 @@ window.addMatch = async () => {
 
 async function vNuevo(_, qs) {
   const ms = allMatches(); const sel = qs.get('match');
-  return `<h1>Nuevo expediente</h1><div class="card">
+  return `${hero('Nuevo expediente', 'en tres datos: el partido, el enlace pirata y, si lo tenés, el video.')}<div class="card">
   <label>Partido</label><select id="nMatch">${ms.map(m => `<option value="${esc(m.id)}" ${m.id === sel ? 'selected' : ''}>${esc(matchName(m))} · ${fmtD(m.kickoff)}</option>`).join('')}</select>
   <label>URL de la página pirata (donde se ve el reproductor)</label><input id="nUrl" placeholder="https://sitio-pirata.xyz/canal/tnt" inputmode="url">
   <label>URL del video (.m3u8) — opcional, si la tenés de las herramientas de red</label><input id="nVid" placeholder="https://cdn.ejemplo/live/index.m3u8" inputmode="url">
@@ -271,7 +285,7 @@ async function vExpedientes(_, qs) {
   const hay = (c) => [c.num, c.target, matchName(c.match), c.notes, c.watermark && c.watermark.payload, c.analysis && JSON.stringify(c.analysis.hosts.map(h => [h.host, h.a, h.ips.map(i => [i.asn, i.holder])])), c.promos.map(p => p.url + p.account).join(' ')].join(' ').toLowerCase();
   const list = DB.cases.filter(c => (!q || hay(c).includes(q)) && (!st || (st === 's' ? c.seal : !c.seal)) && (!mt || c.match.id === mt)).reverse();
   const ms = [...new Map(DB.cases.map(c => [c.match.id, c.match])).values()];
-  return `<h1>Expedientes</h1>
+  return `${hero('Expedientes', 'para buscar y auditar por dominio, IP, proveedor, marca de agua o cuenta.')}
   <div class="card"><div class="grid"><div><label>Buscar (dominio, IP, ASN, proveedor, marca, cuenta)</label><input id="fq" value="${esc(q)}" placeholder="ej: AS13335, 185.x, futbollibre"></div>
   <div><label>Estado</label><select id="fst"><option value="">Todos</option><option value="b" ${st === 'b' ? 'selected' : ''}>Borrador</option><option value="s" ${st === 's' ? 'selected' : ''}>Sellado</option></select></div>
   <div><label>Partido</label><select id="fm"><option value="">Todos</option>${ms.map(m => `<option value="${esc(m.id)}" ${m.id === mt ? 'selected' : ''}>${esc(matchName(m))}</option>`).join('')}</select></div></div>
@@ -311,16 +325,16 @@ async function vExp(id) {
   <div class="card"><div class="row sp"><div><b>${esc(matchName(c.match))}</b><div class="small mut">${esc(c.match.league || '')} · ${fmt(c.match.kickoff)}${c.match.venue ? ' · ' + esc(c.match.venue) : ''}</div></div>${c.seal ? '<span class="pill ok">Sellado v' + c.version + '</span>' : '<span class="pill warn">Borrador v' + c.version + '</span>'}</div>
   <table style="margin-top:8px"><tr><th>Enlace pirata</th><td class="mono">${esc(c.target)}</td></tr><tr><th>Creado</th><td>${fmt(c.createdAt)}</td></tr>${c.notes ? `<tr><th>Notas</th><td>${esc(c.notes)}</td></tr>` : ''}</table>
   <h3>Solidez del expediente: ${s.pct}%</h3><div class="bar"><i style="width:${s.pct}%"></i></div>
-  <ul class="check small">${s.items.map(([t, w, ok]) => `<li>${ok ? '✅' : '⬜'} ${esc(t)} <span class="mut">(${w})</span></li>`).join('')}</ul>
+  <ul class="check small">${s.items.map(([t, w, ok]) => `<li>${ok ? '<i class="ck y"></i>' : '<i class="ck"></i>'} ${esc(t)} <span class="mut">(${w})</span></li>`).join('')}</ul>
   ${rein.length ? `<div class="verdict warn">⚠ Reincidencia detectada: ${rein.map(r => `${esc(r.type)} ${esc(r.key)} en ${r.n} exp.`).join(' · ')}</div>` : ''}</div>
 
-  <div class="card step ${wm ? (wm.verdict === 'ok' ? 'done' : 'bad') : ''}"><h2>1 · Prueba de señal oficial (marca de agua)</h2>
+  <div class="card step ${wm ? (wm.verdict === 'ok' ? 'done' : 'bad') : ''}"><div class="fig">PASO 1.0</div><h2>Prueba de señal oficial (marca de agua)</h2>
   <p class="small mut">Pegá el payload que devolvió el detector forense al analizar la captura del stream. La plataforma verifica que corresponde a este partido y a qué licenciatario se emitió, y que el sitio no es un dominio propio de ese licenciatario.</p>
   ${ro ? '' : `<div class="row"><input id="wmIn" class="mono" placeholder="AR-XXXXXX-LIC-XXXXXXXX-XXXX" value="${esc(wm ? wm.payload : '')}" style="flex:1"><button onclick="doWatermark('${c.id}')">Verificar</button></div>`}
   ${wm ? `<div class="verdict ${wm.verdict}">${wm.verdict === 'ok' ? '✔ Señal oficial redistribuida sin autorización' : '✖ La marca no prueba señal oficial no autorizada'}</div>
-  <div class="mono">${esc(wm.payload)}</div><ul class="check small">${wm.checks.map(x => `<li>${x.ok ? '✅' : x.soft ? '⚠️' : '❌'} ${esc(x.t)}</li>`).join('')}</ul><div class="small mut">Verificado ${fmt(wm.checkedAt)}</div>` : ''}</div>
+  <div class="mono">${esc(wm.payload)}</div><ul class="check small">${wm.checks.map(x => `<li>${x.ok ? '<i class="ck y"></i>' : x.soft ? '<i class="ck w"></i>' : '<i class="ck n"></i>'} ${esc(x.t)}</li>`).join('')}</ul><div class="small mut">Verificado ${fmt(wm.checkedAt)}</div>` : ''}</div>
 
-  <div class="card step ${dh ? 'done' : a ? 'warn' : ''}"><h2>2 · Servidor que entrega el video</h2>
+  <div class="card step ${dh ? 'done' : a ? 'warn' : ''}"><div class="fig">PASO 2.0</div><h2>Servidor que entrega el video</h2>
   <p class="small mut">Bloquear la página que muestra el reproductor no corta el video: el análisis sigue los iframes y manifiestos hasta el host que sirve los segmentos.</p>
   ${ro || c.demo ? '' : `<label>URL del video (.m3u8/.mpd) si la conocés</label><div class="row"><input id="vidIn" class="mono" value="${esc(c.videoUrl || '')}" placeholder="opcional" style="flex:1"><button id="anBtn" onclick="runAnalysis('${c.id}')">${a ? 'Re-analizar' : 'Analizar'}</button></div>`}
   <div id="anStatus"></div>
@@ -334,7 +348,7 @@ async function vExp(id) {
    <div class="small mut" style="margin-top:6px">Análisis ${fmt(a.startedAt)} · ${esc(a.analyzer)} · hash del informe <span class="mono">${esc(a.reportSha256)}</span></div>
    ${tsaBox(c.analysisTsa, 'Sello del informe técnico')}` : ''}</div>
 
-  <div class="card step ${c.captures.length ? (c.captures.every(x => x.tsa && x.tsa.genTime) ? 'done' : 'warn') : ''}"><h2>4 · Capturas: hashes y sellos de tiempo</h2>
+  <div class="card step ${c.captures.length ? (c.captures.every(x => x.tsa && x.tsa.genTime) ? 'done' : 'warn') : ''}"><div class="fig">PASO 4.0</div><h2>Capturas: hashes y sellos de tiempo</h2>
   <p class="small mut">El archivo no sale de tu teléfono: el SHA-256 se calcula localmente y solo el hash viaja a la autoridad de sellado (FreeTSA, RFC 3161). Guardá el archivo original: cualquier alteración cambia el hash.</p>
   ${ro ? '' : `<label class="btn">+ Agregar capturas (foto/video)<input type="file" multiple accept="image/*,video/*" hidden onchange="addCaptures('${c.id}',this.files)"></label>`}
   <div id="capStatus"></div>
@@ -343,15 +357,15 @@ async function vExp(id) {
    <div class="mono">SHA-256 ${esc(x.sha256)}</div><div class="small mut">Registrada ${fmt(x.addedAt)}</div>${tsaBox(x.tsa)}
    <div class="row noprint" style="margin-top:6px">${x.tsa && x.tsa.tsr ? `<button class="ghost" onclick="dlTsr('${c.id}',${i})">Descargar sello .tsr</button>` : ''}${!ro && (!x.tsa || !x.tsa.genTime) ? `<button class="ghost" onclick="restamp('${c.id}',${i})">Reintentar sello</button>` : ''}</div></div>`).join('')}</div>
 
-  <div class="card step ${c.promos.length ? 'done' : ''}"><h2>5 · Dónde se promocionó el enlace</h2>
+  <div class="card step ${c.promos.length ? 'done' : ''}"><div class="fig">PASO 5.0</div><h2>Dónde se promocionó el enlace</h2>
   ${ro ? '' : `<div class="grid"><div><label>URL del posteo/mensaje</label><input id="pUrl" placeholder="https://x.com/... · t.me/... · discord.com/..."></div><div><label>Cuenta / canal</label><input id="pAcc" placeholder="@usuario o nombre del canal"></div><div><label>Alcance (seguidores/miembros)</label><input id="pReach" inputmode="numeric"></div></div><label>Captura del posteo (opcional, se hashea)</label><input id="pFile" type="file" accept="image/*"><div class="row" style="margin-top:8px"><button onclick="addPromo('${c.id}')">Agregar</button></div>`}
   ${c.promos.length ? `<div class="tbl"><table><tr><th>Red</th><th>Cuenta</th><th>Enlace</th><th>Alcance</th><th>Registrado</th></tr>${c.promos.map(p => `<tr><td><span class="pill info">${esc(p.platform)}</span></td><td>${esc(p.account || '—')}</td><td class="mono">${esc(p.url)}${p.sha256 ? `<div class="mut">captura ${esc(p.sha256.slice(0, 16))}…</div>` : ''}</td><td>${esc(p.reach || '—')}</td><td>${fmt(p.addedAt)}</td></tr>`).join('')}</table></div>` : ''}</div>
 
-  <div class="card step ${c.expiry ? 'done' : ''}"><h2>6 · Medida y vencimiento propuesto</h2>
+  <div class="card step ${c.expiry ? 'done' : ''}"><div class="fig">PASO 6.0</div><h2>Medida y vencimiento propuesto</h2>
   ${ro ? '' : `<button class="ghost" onclick="doExpiry('${c.id}')" ${a ? '' : 'disabled'}>${c.expiry ? 'Recalcular' : 'Proponer vencimiento'}</button>${a ? '' : ' <span class="small mut">(requiere análisis)</span>'}`}
   ${c.expiry ? `<p class="small">${esc(c.expiry.why)}</p><div class="tbl"><table><tr><th>Objetivo</th><th>Método</th><th>Vence</th></tr>${c.expiry.items.map((it, i) => `<tr><td>${esc(it.target)}${it.note ? `<div class="small mut">${esc(it.note)}</div>` : ''}</td><td>${esc(it.method)}</td><td>${it.until ? (ro ? fmt(it.until) : `<input type="date" value="${it.until.slice(0, 10)}" onchange="setUntil('${c.id}',${i},this.value)">`) : '—'}</td></tr>`).join('')}</table></div>` : ''}</div>
 
-  <div class="card step ${c.seal ? 'done' : ''}"><h2>7 · Sellado del expediente</h2>
+  <div class="card step ${c.seal ? 'done' : ''}"><div class="fig">PASO 7.0</div><h2>Sellado del expediente</h2>
   ${c.seal ? `<div class="verdict ok">Expediente sellado. Hash SHA-256 del contenido:</div><div class="mono">${esc(c.seal.sha256)}</div>${tsaBox(c.seal.tsa, 'Sello del expediente')}
    <div class="row noprint" style="margin-top:8px">${c.seal.tsa && c.seal.tsa.tsr ? `<button class="ghost" onclick="dlSealTsr('${c.id}')">Descargar sello .tsr</button>` : ''}<button class="ghost" onclick="reopen('${c.id}')">Nueva versión</button></div>
    <p class="small mut">Verificación externa: <span class="mono">openssl ts -verify -digest ${esc(c.seal.sha256)} -in sello.tsr -CAfile cacert.pem -untrusted tsa.crt</span> (certificados en freetsa.org).</p>`
@@ -462,7 +476,7 @@ window.importAll = async (f) => {
 async function vConocimiento() {
   const k = knowledge();
   const rows = (map, cols) => [...map.values()].sort((a, b) => b.cases.size - a.cases.size).map(e => `<tr><td class="mono"><a href="#/expedientes?q=${encodeURIComponent(e.key)}">${esc(e.key)}</a></td>${cols(e)}<td><span class="pill ${e.cases.size > 1 ? 'bad' : ''}">${e.cases.size}</span></td><td>${e.matches.size}</td><td>${fmtD(e.last)}</td></tr>`).join('');
-  return `<h1>Base de conocimiento</h1><p class="small mut">Se alimenta con cada expediente: dominios, IPs y proveedores relevados. Los nuevos análisis se cruzan contra esta base para detectar reincidencia y endurecer el vencimiento propuesto.</p>
+  return `${hero('Base de conocimiento', 'que aprende con cada caso y detecta reincidencia.')}<p class="small mut">Se alimenta con cada expediente: dominios, IPs y proveedores relevados. Los nuevos análisis se cruzan contra esta base para detectar reincidencia y endurecer el vencimiento propuesto.</p>
   <div class="card"><h2>Proveedores (ASN)</h2><div class="tbl"><table><tr><th>ASN</th><th>Titular</th><th>Tipo</th><th>Exp.</th><th>Partidos</th><th>Último</th></tr>${rows(k.asn, e => `<td>${esc(e.holder || '')}</td><td>${esc(e.kind || '')}</td>`) || '<tr><td colspan=6 class="mut">Sin datos</td></tr>'}</table></div></div>
   <div class="card"><h2>Dominios</h2><div class="tbl"><table><tr><th>Dominio</th><th>Rol</th><th>Exp.</th><th>Partidos</th><th>Último</th></tr>${rows(k.dom, e => `<td>${esc(e.role || '')}</td>`) || '<tr><td colspan=5 class="mut">Sin datos</td></tr>'}</table></div></div>
   <div class="card"><h2>IPs</h2><div class="tbl"><table><tr><th>IP</th><th>ASN</th><th>Exp.</th><th>Partidos</th><th>Último</th></tr>${rows(k.ip, e => `<td>AS${esc(e.asn)}</td>`) || '<tr><td colspan=5 class="mut">Sin datos</td></tr>'}</table></div></div>`;
@@ -472,7 +486,7 @@ async function vConocimiento() {
 async function vLicencias() {
   const ms = allMatches();
   const mk = DB.marks.slice(-30).reverse();
-  return `<h1>Licenciatarios y marcas de agua</h1>
+  return `${hero('Licenciatarios', 'autorizados y el registro de marcas de agua emitidas.')}
   <div class="card"><h2>Licenciatarios autorizados</h2><p class="small mut">Dominios propios donde cada licenciatario puede exhibir la señal. Datos de ejemplo: revisalos y completalos con los contratos vigentes.</p>
   ${DB.licensees.map((l, i) => `<div class="card" style="background:var(--card2)"><div class="row sp"><b>${esc(l.name)}</b><span class="pill info">${esc(l.code)}</span></div><label>Dominios autorizados (separados por coma)</label><input value="${esc(l.domains.join(', '))}" onchange="setLicDomains(${i},this.value)"></div>`).join('')}
   <div class="grid"><div><label>Nombre</label><input id="lName"></div><div><label>Código (3 letras)</label><input id="lCode" maxlength="3"></div><div><label>Dominios</label><input id="lDom"></div></div><div class="row" style="margin-top:8px"><button onclick="addLic()">Agregar licenciatario</button></div></div>
@@ -501,7 +515,7 @@ window.genMarks = async () => {
 
 /* --- Verificar --- */
 async function vVerificar() {
-  return `<h1>Verificar integridad</h1>
+  return `${hero('Verificar', 'que ninguna captura ni expediente fue alterado.')}
   <div class="card"><h2>¿Este archivo es la captura original?</h2><p class="small mut">Elegí un archivo: se calcula su SHA-256 y se busca en todos los expedientes.</p><input type="file" onchange="verifyFile(this.files[0])"><div id="vf"></div></div>
   <div class="card"><h2>¿El expediente fue alterado?</h2><p class="small mut">Cargá el JSON exportado de un expediente sellado: se recalcula el hash y se compara con el sellado ante la TSA.</p><input type="file" accept=".json" onchange="verifyJson(this.files[0])"><div id="vj"></div></div>
   <div class="card"><h2>Expedientes en este dispositivo</h2><button class="ghost" onclick="verifyLocal()">Verificar todos</button><div id="vl"></div></div>`;
@@ -529,7 +543,7 @@ window.verifyLocal = async () => { let h = ''; for (const c of DB.cases) { const
 /* --- Auditoría --- */
 async function vAuditoria() {
   const v = await verifyAudit();
-  return `<h1>Auditoría</h1><div class="verdict ${v.ok ? 'ok' : 'bad'}">${v.ok ? `✔ Registro íntegro: ${v.n} eventos encadenados por hash` : `✖ Registro alterado en el evento #${v.at}: ${esc(v.why)}`}</div>
+  return `${hero('Auditoría', 'de cada acción, encadenada por hash.')}<div class="verdict ${v.ok ? 'ok' : 'bad'}">${v.ok ? `✔ Registro íntegro: ${v.n} eventos encadenados por hash` : `✖ Registro alterado en el evento #${v.at}: ${esc(v.why)}`}</div>
   <div class="row"><button class="ghost" onclick="download('auditoria.json', JSON.stringify(DB.audit,null,1))">Exportar registro</button></div>
   <div class="card tbl" style="margin-top:10px"><table><tr><th>#</th><th>Fecha</th><th>Acción</th><th>Detalle</th><th>Hash</th></tr>${DB.audit.slice().reverse().map(e => `<tr><td>${e.i}</td><td>${fmt(e.ts)}</td><td>${esc(e.action)}${e.caseId && getCase(e.caseId) ? `<div><a href="#/exp/${e.caseId}">${esc(getCase(e.caseId).num)}</a></div>` : ''}</td><td class="small">${esc(e.detail)}</td><td class="mono small">${e.hash.slice(0, 12)}…</td></tr>`).join('')}</table></div>`;
 }
@@ -558,6 +572,7 @@ window.loadDemo = async () => {
 };
 
 /* ===== Inicio ===== */
-$('#menuBtn').onclick = () => $('#nav').classList.toggle('open');
+$('#menuBtn').onclick = () => document.body.classList.toggle('menu');
+$('#nav').addEventListener('click', (e) => { if (e.target.closest('a')) document.body.classList.remove('menu'); });
 loadFixtures().then(route);
 route();

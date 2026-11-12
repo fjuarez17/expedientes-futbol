@@ -3,27 +3,33 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b1220">
+<meta name="theme-color" content="#42a500">
 <title>Expedientes · Piratería de fútbol argentino</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='19' fill='%23fff' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M20 1a19 19 0 0 0 0 38z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 <header class="top">
-  <div class="brand"><span class="logo">⚽</span><div><b>Expedientes</b><small>Piratería · Fútbol argentino</small></div></div>
-  <button id="menuBtn" class="ghost" aria-label="Menú">☰</button>
+  <a class="mark" href="#/panel" aria-label="Inicio"><span></span></a>
+  <a class="word" href="#/panel">Expedientes</a>
+  <button id="menuBtn" aria-label="Menú"><i></i><i></i></button>
 </header>
 <nav id="nav">
-  <a href="#/panel">Panel</a>
-  <a href="#/partidos">Partidos</a>
-  <a href="#/expedientes">Expedientes</a>
-  <a href="#/conocimiento">Base de conocimiento</a>
-  <a href="#/licencias">Licenciatarios y marcas</a>
-  <a href="#/verificar">Verificar</a>
-  <a href="#/auditoria">Auditoría</a>
+  <a href="#/panel"><em>01</em>Panel</a>
+  <a href="#/partidos"><em>02</em>Partidos</a>
+  <a href="#/expedientes"><em>03</em>Expedientes</a>
+  <a href="#/conocimiento"><em>04</em>Base de conocimiento</a>
+  <a href="#/licencias"><em>05</em>Licenciatarios y marcas</a>
+  <a href="#/verificar"><em>06</em>Verificar</a>
+  <a href="#/auditoria"><em>07</em>Auditoría</a>
+  <p>Piratería · Fútbol argentino</p>
 </nav>
 <main id="app"></main>
+<footer class="foot noprint"><b>Expedientes</b><span>Evidencia verificable contra retransmisiones no autorizadas del fútbol argentino.</span><a href="https://github.com/fjuarez17/expedientes-futbol">Código y documentación →</a></footer>
 <div id="toast"></div>
-<script src="app.js?v=1"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>
