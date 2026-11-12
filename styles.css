@@ -106,3 +106,11 @@ details summary{cursor:pointer;color:var(--lg);margin:8px 0;font-weight:700}
 body.menu .top{z-index:45;background:transparent}body.menu .word{color:var(--w)}body.menu .mark span{border-color:var(--w)}body.menu #menuBtn{background:var(--g)}body.menu #menuBtn i{background:var(--k)}
 .check{list-style:none;padding-left:0}.check li{display:flex;gap:10px;align-items:flex-start}
 .ck{flex:none;width:16px;height:16px;border-radius:50%;border:2px solid #555;margin-top:3px;font-style:normal}.ck.y{background:var(--g);border-color:var(--g)}.ck.w{background:var(--ye);border-color:var(--ye)}.ck.n{background:var(--or);border-color:var(--or)}
+.gwrap{overflow-x:auto;margin:10px 0 16px;background:#0b0b0b;padding:10px}
+.graph .gh{fill:var(--g);font:800 10px var(--f);letter-spacing:.08em}
+.graph .ge{fill:none;stroke:#3a3a3a;stroke-width:1.5}
+.graph .gn rect{fill:#1d1d1d;stroke:#333}.graph .gn text{fill:#fff;font:600 11px ui-monospace,Menlo,monospace}
+.graph .gn.main rect{fill:var(--or);stroke:var(--or)}.graph .gn.main text{fill:#000}
+.graph .gn.cdn rect{stroke:var(--ye)}
+.qcard{border-left:6px solid var(--g)}.qcard.hl{outline:3px solid var(--ye)}
+.qmatch{display:flex;gap:10px;align-items:center;margin:12px 0}

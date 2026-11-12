@@ -211,7 +211,7 @@ function matchRow(m, extra = '') {
 function caseRow(c) {
   const s = score(c);
   const dh = c.analysis && c.analysis.deliveryHost;
-  return `<a class="item" href="#/exp/${c.id}"><div class="row sp"><b>${esc(c.num)} · ${esc(hostOf(c.target))}</b>${c.seal ? '<span class="pill ok">Sellado</span>' : '<span class="pill warn">Borrador</span>'}</div>
+  return `<a class="item" href="#/exp/${c.id}"><div class="row sp"><b>${esc(c.num)} · ${esc(hostOf(c.target))}</b><span>${estadoPill(c)} ${c.seal ? '<span class="pill ok">Sellado</span>' : '<span class="pill warn">Borrador</span>'}</span></div>
   <div class="small mut">${esc(matchName(c.match))} · ${fmt(c.createdAt)}${dh ? ' · video: ' + esc(dh) : ''}${c.demo ? ' · DEMO' : ''}</div>
   <div class="bar" style="margin-top:6px"><i style="width:${s.pct}%"></i></div></a>`;
 }
@@ -232,7 +232,7 @@ async function vPanel() {
   </div>
   ${sec('Próximos partidos', upcoming.length ? matchTiles(upcoming) : '<p>Sin partidos próximos cargados. <a href="#/partidos">Agregar partido</a></p>')}
   <div class="card"><div class="row sp"><h2>Últimos expedientes</h2><a href="#/expedientes">Ver todos</a></div><div class="list">${cs.slice(-5).reverse().map(caseRow).join('') || '<p class="mut">Todavía no hay expedientes.</p>'}</div>
-  ${cs.length ? '' : '<button class="ghost" onclick="loadDemo()">Cargar expediente de demostración</button>'}</div>
+  <button class="ghost" onclick="loadDemo()">Cargar expediente de demostración</button></div>
   <section class="sec"><h3 class="lbl">Cómo funciona</h3><div class="prose"><b>Así se arma un expediente.</b> Elegís el partido, pegás el enlace pirata y la plataforma sigue la cadena página → reproductor embebido → manifiesto de video → segmentos, para llegar al servidor que realmente entrega el video (host, IP, ASN). Evalúa cuántos sitios comparten esa IP, verifica la marca de agua forense contra el partido y el licenciatario, calcula hashes SHA-256 y pide sellos de tiempo RFC 3161 a una autoridad externa. Cada acción queda en un registro de auditoría encadenado por hash.</div></section>`;
 }
 
@@ -370,6 +370,7 @@ async function vExp(id) {
    <div class="row noprint" style="margin-top:8px">${c.seal.tsa && c.seal.tsa.tsr ? `<button class="ghost" onclick="dlSealTsr('${c.id}')">Descargar sello .tsr</button>` : ''}<button class="ghost" onclick="reopen('${c.id}')">Nueva versión</button></div>
    <p class="small mut">Verificación externa: <span class="mono">openssl ts -verify -digest ${esc(c.seal.sha256)} -in sello.tsr -CAfile cacert.pem -untrusted tsa.crt</span> (certificados en freetsa.org).</p>`
     : `<p class="small mut">Congela el expediente: calcula el SHA-256 de todo su contenido y lo sella con hora oficial. Cualquier cambio posterior se detecta en “Verificar”.</p><button class="ok" onclick="sealCase('${c.id}')">Sellar expediente</button>`}</div>
+  ${await oracleCards(c)}
   <div class="row noprint"><button class="bad" onclick="delCase('${c.id}')">Eliminar</button></div>`;
 }
 
@@ -446,7 +447,7 @@ window.addPromo = async (id) => {
 };
 window.doExpiry = async (id) => { const c = getCase(id); c.expiry = proposeExpiry(c); save(); await audit('vencimiento_propuesto', id, c.expiry.why); route(); };
 window.setUntil = async (id, i, v) => { const c = getCase(id); c.expiry.items[i].until = new Date(v + 'T23:59:00-03:00').toISOString(); c.expiry.edited = true; save(); await audit('vencimiento_editado', id, `${c.expiry.items[i].target} → ${v}`); };
-function sealPayload(c) { const { seal, ...rest } = c; const r = JSON.parse(JSON.stringify(rest)); r.captures.forEach(x => delete x.thumb); return r; }
+function sealPayload(c) { const { seal, estado, signature, annexOf, rejection, ...rest } = c; const r = JSON.parse(JSON.stringify(rest)); r.captures.forEach(x => delete x.thumb); return r; }
 window.sealCase = async (id) => {
   const c = getCase(id);
   if (score(c).pct < 50 && !confirm('El expediente tiene solidez baja. ¿Sellar igual?')) return;
@@ -550,8 +551,8 @@ async function vAuditoria() {
 
 /* --- Demo --- */
 window.loadDemo = async () => {
-  const m = allMatches().find(x => /Gimnasia|Boca|River/.test(matchName(x))) || allMatches()[0] || { id: 'm-demo', home: 'Boca Juniors', away: 'River Plate', kickoff: new Date().toISOString() };
-  if (!matchById(m.id)) DB.matches.push(m);
+  const m = { id: 'm-demo-' + uid(), home: 'Boca Juniors', away: 'River Plate', kickoff: new Date(Date.now() - 35 * 60e3).toISOString(), league: 'Liga Profesional de Fútbol', source: 'demo' };
+  DB.matches.push(m);
   const pay = await makePayload(m.id, 'ESP', '4F1C09A2');
   if (!DB.marks.some(k => k.payload === pay)) DB.marks.push({ payload: pay, session: '4F1C09A2', note: 'decodificador #4471 (demo)' });
   DB.seq++;
@@ -574,5 +575,4 @@ window.loadDemo = async () => {
 /* ===== Inicio ===== */
 $('#menuBtn').onclick = () => document.body.classList.toggle('menu');
 $('#nav').addEventListener('click', (e) => { if (e.target.closest('a')) document.body.classList.remove('menu'); });
-loadFixtures().then(route);
-route();
+window.addEventListener('DOMContentLoaded', () => { loadFixtures().then(route); route(); });

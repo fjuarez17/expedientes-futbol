@@ -129,6 +129,21 @@ Reglas, editables a mano:
 
 ---
 
+## Oráculo, juez de turno y registro público (v3)
+
+Archivo `oraculo.js` (modo local) + `supabase/schema.sql` (modo multiusuario).
+
+- **Filtro de consenso** (paso 9): pasan a la cola del juez solo los expedientes que cumplen las cuatro señales: 1) la marca de agua coincide con un partido **en curso**; 2) ningún dominio del caso está en la lista de licenciatarios; 3) el video se reproduce desde **dos o más puntos independientes** (`api/probe` → nodos de check-host.net en distintos países/ASN); 4) el riesgo colateral está calculado y hay un tipo de bloqueo recomendado. Si falla una, va a **revisión humana**. Si pasa, el expediente se congela (SHA-256 + sello RFC 3161).
+- **Juez de turno** (`#/juez`): tabla de turnos (`juez_id`, `jurisdiccion`, `desde`, `hasta`). El juez competente se calcula por consulta; la cola se ordena por minutos restantes del partido; el traspaso de turno queda en la auditoría. La firma es **Ed25519** (WebCrypto; ECDSA P-256 si el navegador no soporta Ed25519) sobre `{sha256, juez_id, ts}`: si el expediente cambia, la firma deja de verificar. Al firmar se generan las órdenes.
+- **Aviso**: si se configura un webhook de n8n, `api/notify` le manda número, juez, contacto y link directo a la tarjeta.
+- **Grafo de origen** (paso 8 y `#/origenes`): página → reproductor → host de video → IP → ASN, más `api/trace`: RDAP (registrador, fecha de alta, dominios nuevos ≤ 30 días), nameservers y dominios hermanos por Certificate Transparency (certspotter). Agrupa por host de video, sesión de marca de agua, nameservers y ASN.
+- **Anexo dinámico**: un dominio nuevo con el mismo host de video o la misma sesión de marca de agua que un expediente ya firmado se anexa a ese expediente y suma una orden, en vez de abrir uno nuevo.
+- **Registro público** (`#/transparencia`): qué se bloqueó, tipo, juzgado, desde/hasta, estado (vigente / vencida / levantada por reclamo) y el hash de cabecera de la auditoría. Sin evidencia ni identidad de quien reportó. Botón “Mi sitio fue bloqueado por error” → reclamo que resuelve el juez de turno.
+
+**Falta para producción:** ejecutar `supabase/schema.sql`, login de jueces con Supabase Auth, mover los datos de `localStorage` a las tablas, Realtime para la cola y firma digital con certificado en lugar de la clave Ed25519 del MVP. En modo local el selector "Actuás como" reemplaza al login y los jueces y turnos cargados son de ejemplo.
+
+---
+
 ## Cómo funciona por dentro
 
 ```
