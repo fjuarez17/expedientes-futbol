@@ -213,10 +213,10 @@ function score(c) {
     ['Proveedor (ASN) identificado', 10, !!(dh && dh.ips[0] && dh.ips[0].asn)],
     ['Riesgo colateral evaluado', 10, !!(dh && dh.collateral)],
     ['Capturas con hash SHA-256', 10, c.captures.length > 0],
-    ['Capturas con sello de tiempo RFC 3161', 10, c.captures.length > 0 && c.captures.every(x => x.tsa && x.tsa.genTime)],
+    ['Capturas con sello de tiempo RFC 3161' + (c.captures.some(x => x.tsa && x.tsa.demo) ? ' (sello simulado DEMO: no suma)' : ''), 10, c.captures.length > 0 && c.captures.every(x => realTsa(x.tsa))],
     ['Promoción del enlace documentada', 5, c.promos.length > 0],
     ['Vencimiento propuesto', 5, !!c.expiry],
-    ['Expediente sellado', 5, !!(c.seal && c.seal.tsa && c.seal.tsa.genTime)],
+    ['Expediente sellado' + (c.seal && c.seal.tsa && c.seal.tsa.demo ? ' (sello simulado DEMO: no suma)' : ''), 5, !!(c.seal && realTsa(c.seal.tsa))],
   ];
   return { items, pct: items.reduce((s, [, w, ok]) => s + (ok ? w : 0), 0) };
 }
@@ -360,10 +360,11 @@ function hostCard(h, isDelivery) {
 function tsaBox(t, label) {
   if (!t) return '';
   if (t.error) return `<div class="stamp small" style="border-color:var(--bad)">Sello no obtenido: ${esc(t.error)}</div>`;
+  if (t.demo) return `<div class="stamp small" style="border-color:var(--warn)"><span class="pill warn">DEMO</span> <b>${esc(label || 'Sello de tiempo')}</b>: sello simulado (${esc(t.genTime)}), sin valor probatorio y sin .tsr. No suma solidez ni se puede publicar. Las TSAs no respondieron: ${esc(t.reason || '')}</div>`;
   return `<div class="stamp small">🕒 <b>${esc(label || 'Sello de tiempo')}</b>: ${fmt(t.genTime)} (${esc(t.genTime)}) · ${esc(t.tsa)} · ${t.imprintPresent ? 'hash incluido en el sello ✔' : 'revisar'}</div>`;
 }
 function verifyHint(hash, t) {
-  if (!t || !t.genTime) return '';
+  if (!realTsa(t)) return '';
   const ca = !t.tsaId || t.tsaId === 'freetsa' ? '-CAfile cacert.pem -untrusted tsa.crt' : '-CAfile /etc/ssl/certs/ca-certificates.crt';
   const note = !t.tsaId || t.tsaId === 'freetsa' ? 'certificados en freetsa.org' : 'el certificado de la TSA viene dentro del sello; la raíz está en el almacén del sistema';
   return `<p class="small mut">Verificación externa: <span class="mono">openssl ts -verify -digest ${esc(hash)} -in sello.tsr ${ca}</span> (${note}).</p>`;
@@ -401,14 +402,14 @@ async function vExp(id) {
    <div class="small mut" style="margin-top:6px">Análisis ${fmt(a.startedAt)} · ${esc(a.analyzer)} · hash del informe <span class="mono">${esc(a.reportSha256)}</span></div>
    ${tsaBox(c.analysisTsa, 'Sello del informe técnico')}` : ''}</div>
 
-  <div class="card step ${c.captures.length ? (c.captures.every(x => x.tsa && x.tsa.genTime) ? 'done' : 'warn') : ''}"><div class="fig">PASO 4.0</div><h2>Capturas: hashes y sellos de tiempo</h2>
+  <div class="card step ${c.captures.length ? (c.captures.every(x => realTsa(x.tsa)) ? 'done' : 'warn') : ''}"><div class="fig">PASO 4.0</div><h2>Capturas: hashes y sellos de tiempo</h2>
   <p class="small mut">El archivo no sale de tu teléfono: el SHA-256 se calcula localmente y solo el hash viaja a la autoridad de sellado (RFC 3161: FreeTSA y, si no responde, Sectigo). Guardá el archivo original: cualquier alteración cambia el hash.</p>
   ${ro ? '' : `<label class="btn">+ Agregar capturas (foto/video)<input type="file" multiple accept="image/*,video/*" hidden onchange="addCaptures('${c.id}',this.files)"></label>`}
   <div id="capStatus"></div>
   <div class="thumbs" style="margin:8px 0">${c.captures.filter(x => x.thumb).map(x => `<img src="${x.thumb}" alt="">`).join('')}</div>
   ${c.captures.map((x, i) => `<div class="card" style="background:var(--card2)"><div class="row sp"><b>${esc(x.name)}</b><span class="small mut">${(x.size / 1024).toFixed(0)} KB · ${esc(x.type)}</span></div>
    <div class="mono">SHA-256 ${esc(x.sha256)}</div><div class="small mut">Registrada ${fmt(x.addedAt)}</div>${tsaBox(x.tsa)}
-   <div class="row noprint" style="margin-top:6px">${x.tsa && x.tsa.tsr ? `<button class="ghost" onclick="dlTsr('${c.id}',${i})">Descargar sello .tsr</button>` : ''}${!ro && (!x.tsa || !x.tsa.genTime) ? `<button class="ghost" onclick="restamp('${c.id}',${i})">Reintentar sello</button>` : ''}</div></div>`).join('')}</div>
+   <div class="row noprint" style="margin-top:6px">${x.tsa && x.tsa.tsr ? `<button class="ghost" onclick="dlTsr('${c.id}',${i})">Descargar sello .tsr</button>` : ''}${!ro && !realTsa(x.tsa) ? `<button class="ghost" onclick="restamp('${c.id}',${i})">Reintentar sello</button>` : ''}</div></div>`).join('')}</div>
 
   <div class="card step ${c.promos.length ? 'done' : ''}"><div class="fig">PASO 5.0</div><h2>Dónde se promocionó el enlace</h2>
   ${ro ? '' : `<div class="grid"><div><label>URL del posteo/mensaje</label><input id="pUrl" placeholder="https://x.com/... · t.me/... · discord.com/..."></div><div><label>Cuenta / canal</label><input id="pAcc" placeholder="@usuario o nombre del canal"></div><div><label>Alcance (seguidores/miembros)</label><input id="pReach" inputmode="numeric"></div></div><label>Captura del posteo (opcional, se hashea)</label><input id="pFile" type="file" accept="image/*"><div class="row" style="margin-top:8px"><button onclick="addPromo('${c.id}')">Agregar</button></div>`}
@@ -418,9 +419,9 @@ async function vExp(id) {
   ${ro ? '' : `<button class="ghost" onclick="doExpiry('${c.id}')" ${a ? '' : 'disabled'}>${c.expiry ? 'Recalcular' : 'Proponer vencimiento'}</button>${a ? '' : ' <span class="small mut">(requiere análisis)</span>'}`}
   ${c.expiry ? `<p class="small">${esc(c.expiry.why)}</p><div class="tbl"><table><tr><th>Objetivo</th><th>Método</th><th>Vence</th></tr>${c.expiry.items.map((it, i) => `<tr><td>${esc(it.target)}${it.note ? `<div class="small mut">${esc(it.note)}</div>` : ''}</td><td>${esc(it.method)}</td><td>${it.until ? (ro ? fmt(it.until) : `<input type="date" value="${it.until.slice(0, 10)}" onchange="setUntil('${c.id}',${i},this.value)">`) : '—'}</td></tr>`).join('')}</table></div>` : ''}</div>
 
-  <div class="card step ${c.seal ? (c.seal.tsa && c.seal.tsa.genTime ? 'done' : 'warn') : ''}"><div class="fig">PASO 7.0</div><h2>Sellado del expediente</h2>
+  <div class="card step ${c.seal ? (realTsa(c.seal.tsa) ? 'done' : 'warn') : ''}"><div class="fig">PASO 7.0</div><h2>Sellado del expediente</h2>
   ${c.seal ? `<div class="verdict ok">Expediente sellado. Hash SHA-256 del contenido:</div><div class="mono">${esc(c.seal.sha256)}</div>${tsaBox(c.seal.tsa, 'Sello del expediente')}
-   <div class="row noprint" style="margin-top:8px">${c.seal.tsa && c.seal.tsa.tsr ? `<button class="ghost" onclick="dlSealTsr('${c.id}')">Descargar sello .tsr</button>` : ''}${!c.seal.tsa || !c.seal.tsa.genTime ? `<button class="ghost" onclick="restampSeal('${c.id}')">Reintentar sello</button>` : ''}<button class="ghost" onclick="reopen('${c.id}')">Nueva versión</button></div>
+   <div class="row noprint" style="margin-top:8px">${c.seal.tsa && c.seal.tsa.tsr ? `<button class="ghost" onclick="dlSealTsr('${c.id}')">Descargar sello .tsr</button>` : ''}${!realTsa(c.seal.tsa) ? `<button class="ghost" onclick="restampSeal('${c.id}')">Reintentar sello</button>` : ''}<button class="ghost" onclick="reopen('${c.id}')">Nueva versión</button></div>
    ${verifyHint(c.seal.sha256, c.seal.tsa)}`
     : `<p class="small mut">Congela el expediente: calcula el SHA-256 de todo su contenido y lo sella con hora oficial. Cualquier cambio posterior se detecta en “Verificar”.</p><button class="ok" onclick="sealCase('${c.id}')">Sellar expediente</button>`}</div>
   ${await oracleCards(c)}
@@ -435,6 +436,11 @@ async function stamp(hash) {
     return { tsa: j.tsa, tsaId: j.tsaId, genTime: j.genTime, imprintPresent: j.imprintPresent, nonce: j.nonce, tsr: j.tsr, status: j.status };
   } catch { return { error: 'sin conexión con la TSA' }; }
 }
+function realTsa(t) { return !!(t && t.genTime && !t.demo); }
+async function stampFor(c, hash) {
+  const t = await stamp(hash);
+  return t.error && c.demo ? { tsa: 'Sello simulado (DEMO)', tsaId: 'demo', demo: true, genTime: new Date().toISOString(), imprintPresent: false, tsr: null, reason: t.error } : t;
+}
 window.runAnalysis = async (id) => {
   const c = getCase(id); if (!c || c.seal) return;
   const vi = $('#vidIn'); if (vi) c.videoUrl = vi.value.trim() || null;
@@ -446,7 +452,7 @@ window.runAnalysis = async (id) => {
     c.analysis = j; save();
     await audit('analisis_tecnico', c.id, `entrega=${j.deliveryHost || 'no detectada'} hash=${j.reportSha256}`);
     if (st) st.innerHTML = '<p><span class="spin"></span> Sellando informe técnico…</p>';
-    c.analysisTsa = await stamp(j.reportSha256); save();
+    c.analysisTsa = await stampFor(c, j.reportSha256); save();
     if (c.watermark) c.watermark = await checkWatermark(c, c.watermark.payload);
     save(); toast('Análisis completo');
   } catch (e) { toast('Falló el análisis: ' + e.message); }
@@ -473,7 +479,7 @@ window.addCaptures = async (id, files) => {
     if (c.captures.some(x => x.sha256 === hash)) { toast('Captura repetida'); continue; }
     const cap = { name: f.name, size: f.size, type: f.type || 'desconocido', lastModified: new Date(f.lastModified).toISOString(), addedAt: new Date().toISOString(), sha256: hash, thumb: await thumbOf(f) };
     st.innerHTML = `<p><span class="spin"></span> Pidiendo sello de tiempo para ${esc(f.name)}…</p>`;
-    cap.tsa = await stamp(hash);
+    cap.tsa = await stampFor(c, hash);
     c.captures.push(cap); save();
     await audit('captura_agregada', id, `${f.name} sha256=${hash}`);
   }
@@ -481,13 +487,13 @@ window.addCaptures = async (id, files) => {
 };
 window.restampSeal = async (id) => {
   const c = getCase(id); if (!c.seal) return;
-  toast('Pidiendo sello de tiempo…'); c.seal.tsa = await stamp(c.seal.sha256); save();
-  if (c.seal.tsa.genTime) await audit('expediente_sellado', id, `v${c.version} sha256=${c.seal.sha256} (sello reintentado)`);
+  toast('Pidiendo sello de tiempo…'); c.seal.tsa = await stampFor(c, c.seal.sha256); save();
+  if (realTsa(c.seal.tsa)) await audit('expediente_sellado', id, `v${c.version} sha256=${c.seal.sha256} (sello reintentado)`);
   route();
 };
-window.restamp = async (id, i) => { const c = getCase(id); c.captures[i].tsa = await stamp(c.captures[i].sha256); save(); route(); };
-window.dlTsr = (id, i) => { const c = getCase(id), x = c.captures[i]; download(`${c.num}_${x.sha256.slice(0, 12)}.tsr`, b64ToBlob(x.tsa.tsr, 'application/timestamp-reply')); };
-window.dlSealTsr = (id) => { const c = getCase(id); download(`${c.num}_v${c.version}_sello.tsr`, b64ToBlob(c.seal.tsa.tsr, 'application/timestamp-reply')); };
+window.restamp = async (id, i) => { const c = getCase(id); c.captures[i].tsa = await stampFor(c, c.captures[i].sha256); save(); route(); };
+window.dlTsr = (id, i) => { const c = getCase(id), x = c.captures[i]; if (!x.tsa || !x.tsa.tsr) return toast('Este sello no tiene .tsr (simulado o fallido)'); download(`${c.num}_${x.sha256.slice(0, 12)}.tsr`, b64ToBlob(x.tsa.tsr, 'application/timestamp-reply')); };
+window.dlSealTsr = (id) => { const c = getCase(id); if (!c.seal.tsa || !c.seal.tsa.tsr) return toast('Este sello no tiene .tsr (simulado o fallido)'); download(`${c.num}_v${c.version}_sello.tsr`, b64ToBlob(c.seal.tsa.tsr, 'application/timestamp-reply')); };
 function platformOf(u) {
   const h = hostOf(u);
   if (/(^|\.)(x|twitter)\.com$/.test(h)) return 'X';
@@ -501,7 +507,7 @@ window.addPromo = async (id) => {
   const c = getCase(id); const url = $('#pUrl').value.trim(); if (!hostOf(url)) return toast('URL inválida');
   const p = { platform: platformOf(url), url, account: $('#pAcc').value.trim(), reach: $('#pReach').value.trim(), addedAt: new Date().toISOString() };
   const f = $('#pFile').files[0];
-  if (f) { p.sha256 = await sha256File(f); p.file = f.name; p.tsa = await stamp(p.sha256); }
+  if (f) { p.sha256 = await sha256File(f); p.file = f.name; p.tsa = await stampFor(c, p.sha256); }
   c.promos.push(p); save(); await audit('promocion_agregada', id, `${p.platform} ${url}`); route();
 };
 window.doExpiry = async (id) => { const c = getCase(id); c.expiry = proposeExpiry(c); save(); await audit('vencimiento_propuesto', id, c.expiry.why); route(); };
@@ -512,7 +518,7 @@ window.sealCase = async (id) => {
   if (score(c).pct < 50 && !confirm('El expediente tiene solidez baja. ¿Sellar igual?')) return;
   const hash = await sha256Hex(stable(sealPayload(c)));
   toast('Sellando…');
-  c.seal = { sha256: hash, sealedAt: new Date().toISOString(), tsa: await stamp(hash) }; save();
+  c.seal = { sha256: hash, sealedAt: new Date().toISOString(), tsa: await stampFor(c, hash) }; save();
   await audit('expediente_sellado', id, `v${c.version} sha256=${hash}`); route();
 };
 window.reopen = async (id) => {
@@ -595,7 +601,7 @@ window.verifyJson = async (f) => {
   if (!f) return; try {
     const j = JSON.parse(await f.text()); const c = j.case; const r = await checkCase(c);
     const au = j.audit && j.audit.length ? '' : '';
-    $('#vj').innerHTML = `<div class="verdict ${r.ok ? 'ok' : r.ok === false ? 'bad' : 'warn'}">${esc(c.num)}: ${esc(r.t)}</div>${c.seal && c.seal.tsa ? `<p class="small">Sello TSA: ${esc(c.seal.tsa.genTime)} · imprint ${c.seal.tsa.imprintPresent ? 'presente' : '—'}</p>` : ''}${au}`;
+    $('#vj').innerHTML = `<div class="verdict ${r.ok ? 'ok' : r.ok === false ? 'bad' : 'warn'}">${esc(c.num)}: ${esc(r.t)}</div>${c.seal && c.seal.tsa ? `<p class="small">Sello TSA: ${esc(c.seal.tsa.genTime)} · imprint ${c.seal.tsa.imprintPresent ? 'presente' : '—'}${c.seal.tsa.demo ? ' · <b>SIMULADO (DEMO), sin valor probatorio</b>' : ''}</p>` : ''}${au}`;
   } catch { $('#vj').innerHTML = '<div class="verdict bad">JSON inválido</div>'; }
 };
 window.verifyLocal = async () => { let h = ''; for (const c of DB.cases) { const r = await checkCase(c); h += `<div class="verdict ${r.ok ? 'ok' : r.ok === false ? 'bad' : 'warn'} small">${esc(c.num)}: ${esc(r.t)}</div>`; } $('#vl').innerHTML = h || '<p class="mut">Sin expedientes</p>'; };
@@ -640,12 +646,13 @@ window.loadDemo = async () => {
       ] },
     analysisTsa: null, watermark: null, captures: [], promos: [{ platform: 'Telegram', url: 'https://t.me/futbol_gratis_demo/1234', account: 'Fútbol Gratis HD (demo)', reach: '48.000', addedAt: new Date().toISOString() }, { platform: 'X', url: 'https://x.com/demo_futbol/status/1', account: '@demo_futbol', reach: '12.300', addedAt: new Date().toISOString() }], expiry: null, seal: null };
   c.analysis.reportSha256 = await sha256Hex(stable(c.analysis));
+  c.analysisTsa = await stampFor(c, c.analysis.reportSha256);
   DB.cases.push(c); c.watermark = await checkWatermark(c, pay); c.expiry = proposeExpiry(c); save();
   await audit('demo_cargada', c.id, c.num);
   const f = await demoCapture(m, pay);
   if (f) {
     const hash = await sha256File(f);
-    c.captures.push({ name: f.name, size: f.size, type: f.type, lastModified: new Date(f.lastModified).toISOString(), addedAt: new Date().toISOString(), sha256: hash, thumb: await thumbOf(f), tsa: await stamp(hash) }); save();
+    c.captures.push({ name: f.name, size: f.size, type: f.type, lastModified: new Date(f.lastModified).toISOString(), addedAt: new Date().toISOString(), sha256: hash, thumb: await thumbOf(f), tsa: await stampFor(c, hash) }); save();
     await audit('captura_agregada', c.id, `${f.name} sha256=${hash}`);
   }
   location.hash = '#/exp/' + c.id;

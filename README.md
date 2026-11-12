@@ -89,7 +89,7 @@ Función serverless `api/analyze` que:
 - Las capturas (foto o video) se procesan **en el teléfono**: el SHA-256 se calcula localmente y **el archivo no se sube a ningún lado**; solo el hash viaja a la autoridad de sellado.
 - Cada hash se sella con **FreeTSA (RFC 3161)**; si no responde, se pide a **Sectigo**. Solo se usan TSAs por HTTPS: la función no verifica la firma CMS del token, así que una TSA por HTTP plano permitiría que alguien en el camino inyecte un sello falso. El expediente guarda qué TSA selló (`tsa.tsaId`). Si ninguna responde, el sello queda pendiente con un botón **Reintentar sello** (también para el sello del expediente, que solo suma a la solidez cuando tiene hora oficial).
 - Los videos de más de 64 MB se hashean **por partes** (SHA-256 incremental, bloques de 4 MB) para no cargar el archivo entero en la memoria del celular.
-- La **demo** trae una captura de ejemplo generada en el momento, con hash y sello reales: arranca en 95 % y llega al 100 % con **Sellar expediente** o **Correr el oráculo**.
+- La **demo** trae una captura de ejemplo generada en el momento, con hash y sello reales: arranca en 95 % y llega al 100 % con **Sellar expediente** o **Correr el oráculo**. Si ninguna TSA responde, la demo usa sellos **simulados** con etiqueta DEMO: no tienen `.tsr`, no suman solidez, no se pueden publicar y muestran **Reintentar sello**.
 - Se guarda el token `.tsr` (descargable), la hora oficial (`genTime`) y se comprueba que el hash quedó incluido en el sello.
 - Se guarda una miniatura chica de las fotos para el PDF.
 - Se probó la verificación externa con `openssl ts -verify` → `Verification: OK`.
