@@ -1,0 +1,4 @@
+Para: AS64610 NubeRápida CDN (ficticia)
+Objetivo: live.golazo-libre.test (198.51.100.20)
+
+Por orden judicial (Dra. Laura Ficticia — Juzgado de Garantías N.º 3 (ficticio) — Distrito Judicial Centro. Orden EXP-2026-000002, firma 9ea46e101afa33f3…) se informa que el servidor 198.51.100.20 de su red entrega la transmisión no autorizada https://live.golazo-libre.test/hls/en-vivo/index.m3u8 del partido «practica-01», titular Liga Profesional Ficticia. Se solicita: 1) suspender el servicio al cliente que opera ese servidor; 2) preservar los registros de contratación, pago y acceso; 3) no reasignarle otra IP para el mismo uso. Evidencia: expediente EXP-2026-000002, hash d3b935d3092e91c58b123a5e034dd7ca7dacc2b9a99b1c434ca06cf6986ec0ce.

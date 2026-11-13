@@ -5,12 +5,15 @@ Cada punto dice cómo se va a comprobar que quedó resuelto. Se cierra cuando ha
 
 ## P0 · Núcleo: riesgo de perder puntos en la final
 
-1. **Incorporar o rechazar el PR #1 de forma explícita.** El motor del desafío solo existe en ese PR. Si no entra a `main`, la rama principal no tiene envío a proveedores, reintentos, confirmación ni vencimiento: los ítems N11 a N14 quedan en **falta**.
+1. ~~**Incorporar o rechazar el PR #1 de forma explícita.**~~ **Hecho:** incorporado a `main`. El motor del desafío solo existe en ese PR. Si no entra a `main`, la rama principal no tiene envío a proveedores, reintentos, confirmación ni vencimiento: los ítems N11 a N14 quedan en **falta**.
    *Comprobación:* `auditoria/correr.sh` en `main` da «NÚCLEO OK».
-2. **Cambio de turno con juez ausente, automatizado.** Hoy se prueba a mano con `juez_automatico.py --ausente laura`. Hay que sumarlo a `correr.sh` como segunda corrida y exigir que lo pendiente lo firme el juez entrante.
+2. ~~**Cambio de turno con juez ausente, automatizado.**~~ **Hecho:** partido `cambio_turno` de `correr.sh`. Hoy se prueba a mano con `juez_automatico.py --ausente laura`. Hay que sumarlo a `correr.sh` como segunda corrida y exigir que lo pendiente lo firme el juez entrante.
    *Comprobación:* eventos `pendiente_reasignado` y `reenvio_firmado` del juez entrante en `auditoria.jsonl`, y «órdenes firmadas fuera de turno: 0».
 3. **Ensayo contra la IP asignada del partido final.** Correr `correr.sh` apuntando al simulador de la organización (`--simulador http://<ip>:8080`) apenas la publiquen, con la aceleración real (x1).
-4. **Un solo camino para la demo.** Elegir si el juez firma en la interfaz del motor (`:8090`) o en la app web vía Supabase, y escribir el guion paso a paso. Con dos caminos a medio probar en vivo, el riesgo es alto.
+4. ~~**Un solo camino para la demo.**~~ **Hecho:** interfaz del motor (`GUION_DEMO.md`). Elegir si el juez firma en la interfaz del motor (`:8090`) o en la app web vía Supabase, y escribir el guion paso a paso. Con dos caminos a medio probar en vivo, el riesgo es alto.
+
+4 bis. **Juez atento en la final.** Con la jueza ausente se pierde una fase entera y otras dos se bloquean 42 a 45 min tarde (partido `cambio_turno`). Asignar una persona por juez con el celular en la interfaz y el sonido activado, y ensayar el login antes del partido.
+   *Comprobación:* tiempo hasta el primer bloqueo < 2 min en la sección 1 de `verificar.py` de la final.
 
 ## P1 · Solidez de la evidencia (lo que va a preguntar un jurado o un juez)
 
@@ -21,7 +24,7 @@ Cada punto dice cómo se va a comprobar que quedó resuelto. Se cierra cuando ha
 
 ## P2 · Extras
 
-9. **Escenario con reclamo.** El escenario de práctica no trae reclamos, así que E1 no se ejerce. Armar un escenario derivado en `desafio-simulador/datos/` (ficticio, `.test`) con una IP compartida reclamada y verificar levantamiento firmado y reemplazo por dominio.
+9. ~~**Escenario con reclamo.**~~ **Hecho:** partido `reclamo` de `correr.sh` (bloqueo IP forzado sobre una IP compartida). El escenario de práctica no trae reclamos, así que E1 no se ejerce. Armar un escenario derivado en `desafio-simulador/datos/` (ficticio, `.test`) con una IP compartida reclamada y verificar levantamiento firmado y reemplazo por dominio.
 10. **Aviso al juez por WhatsApp o mail** (webhook n8n en `api/notify.js`): falta la URL del webhook.
 11. **Prueba automática del registro público:** que la respuesta de `/publico` y de la vista `registro_publico` no contenga capturas, HAR ni datos de quien reportó.
 

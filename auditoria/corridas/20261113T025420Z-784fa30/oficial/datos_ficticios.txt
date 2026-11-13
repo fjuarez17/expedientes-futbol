@@ -1,0 +1,3 @@
+archivos revisados: 28
+IPs fuera de RFC 5737: 0
+dominios fuera de .test/.example: 0

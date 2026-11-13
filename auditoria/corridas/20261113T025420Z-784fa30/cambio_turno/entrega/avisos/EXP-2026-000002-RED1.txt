@@ -1,0 +1,4 @@
+Para: X (ex Twitter)
+Objetivo: https://x.example/golazolibre/status/2207
+
+Por orden judicial (Dr. Martín Ejemplo — Juzgado de Garantías N.º 1 (ficticio) — Distrito Judicial Norte. Orden EXP-2026-000002, firma 79b00666a3d9cc5d…) se solicita a X (ex Twitter) retirar la publicación https://x.example/golazolibre/status/2207 (minuto 4), que promociona la transmisión no autorizada https://golazo-libre.test/partido, y preservar los datos de la cuenta que la publicó. Evidencia: expediente EXP-2026-000002, hash 8d701c8ff91dfdf3cf70177081f65b78b5173446b9354b937c1c3bb2d216e4ce.

@@ -1,0 +1,68 @@
+commit: 784fa300fdfde6280a7b18efde6685fbfc9b5440
+archivos modificados sin commit (fuera de auditoria/): 0
+fecha UTC: 2026-11-13T02:54:20Z
+aceleracion: x30
+
+== 1. Pruebas unitarias de la app web (node --test)
+OK: # pass 15
+
+== 2. Tres partidos de práctica en paralelo contra el simulador oficial
+oficial: 99 eventos del simulador
+cambio_turno: 99 eventos del simulador
+reclamo: 105 eventos del simulador
+
+== 3. Partido oficial: evaluación oficial (evaluacion/verificar.py)
+Resumen
+  fases piratas bloqueadas: 7 de 7
+  visibilidad residual promedio pct: 4.0
+  ordenes recibidas: 33
+  ordenes aplicadas: 30
+  ordenes fallidas: 3
+  ordenes rechazadas: 0
+  bloqueos con dano colateral: 0
+  dominios legitimos afectados: 0
+  bloqueos falsos positivos: 0
+  bloqueos ip activos post partido: 0
+  reclamos: 0
+  reclamos resueltos por levantamiento: 0
+  ordenes firmadas fuera de turno: 0
+
+OK: 188 entradas de auditoría íntegras. Hash final 40132fda0894e704ecd6e4b700c7ace779ac50ad3c7355fb95d9d89f07c9d446
+OK: 7 expedientes y 38 evidencias íntegras.
+OK: 38 capturas
+IPs fuera de RFC 5737: 0
+dominios fuera de .test/.example: 0
+
+== 4. Cambio de turno con la jueza saliente ausente
+pendientes reasignados al juez entrante: 4
+decisiones firmadas por el juez entrante: 7 · por la jueza saliente: 0
+firmas rechazadas a la jueza fuera de turno: 1
+fases piratas bloqueadas: 6 de 7
+ordenes firmadas fuera de turno: 0
+OK: 196 entradas de auditoría íntegras. Hash final 728d7e7f6543433780a78c5697f569b88a6474e19d14197f390265b0d8bb150a
+OK: 7 expedientes y 38 evidencias íntegras.
+OK: 38 capturas
+IPs fuera de RFC 5737: 0
+dominios fuera de .test/.example: 0
+
+== 5. Reclamo de un sitio legítimo (bloqueo IP forzado sobre live.golazo-libre.test)
+5. Reclamos de sitios afectados
+  R-001 noticias-del-valle.test (aurora, min 10.0): levantada en 0.5 min
+
+reclamo_recibido: 1
+reclamo_verificado: 1
+reclamo_decidido: 1
+orden_levantada: 3
+reclamos resueltos por levantamiento: 1 de 1
+(el daño colateral de este partido es esperado: el bloqueo por IP compartida se fuerza a propósito)
+OK: 197 entradas de auditoría íntegras. Hash final aa60493440fd2326562eeb521af396f5e3b76aafd0d0fb7dcb837ae20ecf8ce2
+OK: 7 expedientes y 38 evidencias íntegras.
+OK: 38 capturas
+IPs fuera de RFC 5737: 0
+dominios fuera de .test/.example: 0
+
+== 6. Huella de la corrida
+sha256 del manifiesto: a8ba9113b36f20247184576e5f3c0d39d9697e428384828317c71e7d1ed66557
+
+== 7. Veredicto
+NÚCLEO OK · CAMBIO DE TURNO OK · RECLAMO OK

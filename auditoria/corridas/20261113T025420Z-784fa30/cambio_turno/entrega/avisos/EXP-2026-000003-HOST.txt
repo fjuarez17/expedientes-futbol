@@ -1,0 +1,4 @@
+Para: AS64620 Pampa Web Hosting Compartido (ficticio)
+Objetivo: tv.verpartido-hd.test (192.0.2.50)
+
+Por orden judicial (Dr. Martín Ejemplo — Juzgado de Garantías N.º 1 (ficticio) — Distrito Judicial Norte. Orden EXP-2026-000003, firma 09fd2966939add02…) se informa que el servidor 192.0.2.50 de su red entrega la transmisión no autorizada https://tv.verpartido-hd.test/hls/en-vivo/index.m3u8 del partido «practica-01», titular Liga Profesional Ficticia. Se solicita: 1) suspender el servicio al cliente que opera ese servidor; 2) preservar los registros de contratación, pago y acceso; 3) no reasignarle otra IP para el mismo uso. Evidencia: expediente EXP-2026-000003, hash b188c02540a71016589d591796fd84762745be37ea549616a305b4986bf2533a.

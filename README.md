@@ -10,6 +10,7 @@ Plataforma web para **armar expedientes verificables de streams piratas** de par
 
 ## Índice
 
+0. [Desafío Fútbol · Hackathon Argentina Space 2026](#desafío-fútbol--hackathon-argentina-space-2026)
 1. [Qué problema resuelve](#qué-problema-resuelve)
 2. [Qué se hizo](#qué-se-hizo)
    - [El expediente, punto por punto](#el-expediente-punto-por-punto)
@@ -22,6 +23,34 @@ Plataforma web para **armar expedientes verificables de streams piratas** de par
 8. [Estructura del repositorio](#estructura-del-repositorio)
 9. [Correrlo y publicarlo](#correrlo-y-publicarlo)
 10. [Aviso legal y de uso](#aviso-legal-y-de-uso)
+
+---
+
+## Desafío Fútbol · Hackathon Argentina Space 2026
+
+Este repo es la entrega del equipo para el desafío *Plataforma federal de órdenes de bloqueo en vivo*
+(Track Datos y Streaming, Salta, 11 al 13 de noviembre de 2026). Tiene dos partes:
+
+| Parte | Qué hace | Dónde |
+|---|---|---|
+| **Motor del desafío** | Corre el circuito completo contra el simulador oficial: expediente → juez de turno → firma → proveedores → confirmación → reintento → vencimiento → auditoría, más reclamos y registro público. Es lo que mide `evaluacion/verificar.py`. | [`desafio-simulador/`](desafio-simulador/) · cómo correrlo: [`desafio-simulador/plataforma/README.md`](desafio-simulador/plataforma/README.md) |
+| **App web** | Expedientes sobre streams reales desde el celular, oráculo de consenso, juez con Supabase (RLS por turno), registro público. Puede hacer de interfaz del juez del motor. | esta raíz · https://expedientes-futbol.vercel.app |
+
+- **Entregables del día 3:** [`entrega/`](entrega/) (expediente exportado, auditoría, propuesta normativa).
+- **Auditoría reproducible:** [`auditoria/`](auditoria/). `auditoria/correr.sh` corre tres partidos de práctica (circuito normal, cambio de turno con juez ausente y reclamo) y compara contra la consigna requisito por requisito.
+- **Guion del video y del partido final:** [`auditoria/GUION_DEMO.md`](auditoria/GUION_DEMO.md).
+
+```bash
+# Circuito completo contra el simulador (Python 3.9+, sin dependencias)
+cd desafio-simulador
+python3 simulador/servidor.py --escenario datos/escenario_practica.json --acelerar 6
+python3 plataforma/servidor.py --simulador http://localhost:8080     # juez en http://localhost:8090/
+python3 evaluacion/verificar.py --log salida/registro.jsonl          # al terminar el partido
+```
+
+**Supuestos.** Todos los datos son ficticios (dominios `.test`/`.example`, IPs RFC 5737, ASN privados) y no se bloquea nada real. La marca de agua llega ya extraída en la detección: la plataforma la valida contra el partido y los licenciatarios, no la extrae del video. La firma de las órdenes es el HMAC de demostración que define el simulador; en la vida real sería firma digital del juez. Los jueces y turnos son los de `datos/juzgados.json`.
+
+**Código que existía antes del evento.** `desafio-simulador/simulador/`, `datos/`, `evaluacion/` y `ejemplos/` son del repo de la organización (qualydata-org/desafio-futbol). Todo lo demás se escribió durante el hackathon (el historial de commits empieza el 12/11/2026). Librerías y servicios de terceros: supabase-js 2.45.4 (CDN), Plus Jakarta Sans (Google Fonts), Supabase, Vercel y las fuentes públicas listadas en [Fuentes de datos](#fuentes-de-datos). El motor usa solo la biblioteca estándar de Python.
 
 ---
 
@@ -231,14 +260,14 @@ Cosas necesarias para usarla en producción y que **no están hechas**:
    - integrarse con la API/export de ese detector,
    - alinear el formato del payload (el `AR-…` es una propuesta propia),
    - cargar el registro real de emisión de marcas por partido.
-2. **Base de datos compartida y usuarios.** Hoy todo vive en el `localStorage` del dispositivo (se puede exportar/importar JSON). Para un equipo hace falta una base central (por ejemplo Postgres/Supabase), **login con roles** (analista, supervisor, legal) y que la cadena de auditoría viva en el servidor.
+2. **Roles y auditoría en el servidor.** Ya hay base compartida (Supabase, con login y RLS por turno del juez), pero sin sesión la app sigue usando el `localStorage` del dispositivo. Faltan más roles (supervisor, legal) y que el consenso y la cadena de auditoría de la app corran en el servidor.
 3. **Datos reales de licenciatarios.** Los dominios autorizados cargados son **de ejemplo**: hay que reemplazarlos por los de los contratos vigentes (incluyendo CDNs y dominios técnicos de cada OTT).
 4. **Fixture completo.** La clave gratuita de TheSportsDB trae pocos partidos; los faltantes se cargan a mano. Falta una fuente oficial o paga (API-Football, la propia LPF/AFA).
-5. **Captura automática del stream.** Hoy las capturas se suben a mano. Falta un capturador (navegador headless) que grabe unos segundos del stream, saque fotogramas para el detector de marcas y lo hashee/selle solo.
+5. **Captura automática del stream.** Ya se captura la página y unos segmentos del stream con hash y sello (PASO 0.0). Falta sacar fotogramas para el detector de marcas y cubrir streams protegidos.
 6. **Streams con JavaScript ofuscado o protegidos.** Si el `.m3u8` se arma por JS dinámico, tokens o anti-bots (Cloudflare challenge), el análisis estático no lo encuentra; hay un campo para pegarlo a mano. Falta un análisis con navegador real que intercepte el tráfico de red.
 7. **Reverse IP sin límites.** HackerTarget gratis tiene cupo diario; para volumen hace falta un proveedor pago (SecurityTrails, DomainTools, WhoisXML) o datos pasivos de DNS.
-8. **Envío de la orden/notificación.** No genera ni manda todavía las notificaciones a ISPs, CDNs (abuse de Cloudflare, etc.), registradores ni plataformas (X, Telegram, Discord).
-9. **Tests automáticos** y CI.
+8. **Envío de la orden/notificación reales.** El motor del desafío ya envía las órdenes firmadas a cada proveedor *del simulador*, con reintentos y confirmación, y genera avisos al hosting y a las redes. No hay integración con ISPs, CDNs, registradores ni plataformas reales.
+9. **CI.** Hay pruebas (`node --test tests/`) y una auditoría reproducible (`auditoria/correr.sh`); el workflow `auditoria/ci/auditoria.yml` está listo pero falta activarlo en `.github/workflows/`.
 
 ---
 

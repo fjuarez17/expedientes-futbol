@@ -7,7 +7,8 @@ Por eso cada afirmación de esta carpeta apunta a un archivo, a una función o a
 | Archivo | Qué es |
 |---|---|
 | `README.md` | Esta matriz: requisito → dónde está → cómo se comprueba → estado. |
-| `correr.sh` | Corre el partido de práctica completo contra el simulador oficial y guarda la evidencia en `corridas/<fecha>-<commit>/`. |
+| `correr.sh` | Corre tres partidos de práctica en paralelo contra el simulador oficial (circuito normal, cambio de turno con jueza ausente y reclamo) y guarda la evidencia en `corridas/<fecha>-<commit>/`. |
+| `GUION_DEMO.md` | Camino único para la demo, guion del video de 3 minutos y pasos del partido final. |
 | `datos_ficticios.py` | Comprueba que las salidas solo tengan dominios `.test`/`.example` e IPs RFC 5737. |
 | `PRIORIDADES.md` | Lo que falta o es débil, ordenado por impacto en la evaluación. |
 | `REVISION.md` | Protocolo para la revisión de "peces dorados" (lectores sin contexto) y registro de sus hallazgos. |
@@ -46,7 +47,7 @@ Estados: **cumple** (hay código y una comprobación automática que lo confirma
 | N7 | Decisión firmada | `decidir_expediente()`: firma HMAC sobre el hash del expediente | `--verificar-auditoria` | parcial: la clave HMAC del juez la guarda el servidor, así que la firma no prueba por sí sola que la puso el juez (la app web usa Ed25519 con la clave en el dispositivo del juez) |
 | N8 | Juez entra con usuario y contraseña | `Plataforma.login()` (PBKDF2), `usuarios_demo.json`; en la app web, Supabase Auth | `juez_automatico.py` hace login | cumple |
 | N9 | Cada juez ve y firma solo lo suyo mientras está de turno | `puede_firmar()`, `vista_juez()`; en Supabase, RLS `juez_de_turno_*` | `verificar.py`: «órdenes firmadas fuera de turno: 0»; `juez_automatico.py` intenta firmar fuera de turno | cumple |
-| N10 | Al cambio de turno lo pendiente pasa al entrante y el saliente ya no firma | `reasignar()` → `pendiente_reasignado`; reenvíos `RE-*` | `juez_automatico.py --ausente laura` (manual, no está en `correr.sh`) | parcial: falta automatizar la prueba con juez ausente |
+| N10 | Al cambio de turno lo pendiente pasa al entrante y el saliente ya no firma | `reasignar()` → `pendiente_reasignado`; reenvíos `RE-*` | partido `cambio_turno` de `correr.sh` (`juez_automatico.py --ausente laura`): exige `pendiente_reasignado` ≥ 1, firmas del entrante ≥ 1, cero firmas de la saliente y un 403 fuera de turno | cumple |
 | N11 | Orden a cada proveedor en el tipo que acepta | `objetivos_para()`, `preparar_envios()` (FibraValle solo dominio) | `verificar.py`: «órdenes rechazadas: 0» | cumple |
 | N12 | Reintento si falla | `enviar()` → `reintentar()` con `orden_id` nuevo y firmas de reserva | `verificar.py`: órdenes fallidas > 0 y fases bloqueadas 7/7 | cumple |
 | N13 | Seguimiento de la confirmación | `seguir_ordenes()` → `confirmacion_aplicada` | `auditoria.jsonl` | cumple |
@@ -57,7 +58,7 @@ Estados: **cumple** (hay código y una comprobación automática que lo confirma
 
 | # | Extra | Dónde está | Cómo se comprueba | Estado |
 |---|---|---|---|---|
-| E1 | Reclamos: verificación, levantamiento firmado, reemplazo más preciso | `verificar_reclamo()`, `decidir_reclamo()` | escenario de práctica sin reclamos: **no se ejerce en la corrida** | parcial: falta un escenario con reclamo |
+| E1 | Reclamos: verificación, levantamiento firmado, reemplazo más preciso | `verificar_reclamo()`, `decidir_reclamo()` | partido `reclamo` de `correr.sh` (`--forzar-bloqueo-ip live.golazo-libre.test`): exige `reclamo_recibido`, `reclamo_verificado`, `reclamo_decidido`, `orden_levantada` y «reclamos resueltos por levantamiento» ≥ 1 en `verificar.py` | cumple |
 | E2 | Registro público de transparencia | motor `/publico`; app web `#/transparencia` (vista `registro_publico`) | revisión manual: no expone capturas, HAR ni reportante | cumple (manual) |
 | E3 | Dónde se promocionó el enlace | expediente (`promocion`), avisos `EXP-*-RED*.txt` | `entrega/avisos/` | cumple |
 | E4 | Interfaz del juez cuidada, celular, notificaciones | `plataforma/web/` (sonido y vibración); app web `#/juez` con Realtime | manual en celular | parcial: sin prueba automática; el aviso por WhatsApp o mail (n8n) no está configurado |
@@ -69,19 +70,21 @@ Suma como diferencial, pero **no reemplaza al núcleo**: la consigna dice que lo
 
 ## Última corrida
 
-`corridas/20261113T023339Z-05d3e17/` (commit `05d3e17`, punta del PR #1, aceleración x30):
+`corridas/20261113T025420Z-784fa30/` (commit `784fa30` = `main` con el PR #1 incorporado + esta carpeta, aceleración x30). La corrida anterior (`20261113T023339Z-05d3e17`, solo el partido normal) queda como histórico.
 
-| Control | Resultado |
-|---|---|
-| Pruebas de la app web (`node --test`) | OK (8 de 8) |
-| Fases piratas bloqueadas | 7 de 7 |
-| Órdenes recibidas / aplicadas / fallidas y reintentadas / rechazadas | 33 / 30 / 3 / 0 |
-| Daño colateral · dominios legítimos afectados · falsos positivos | 0 · 0 · 0 |
-| Bloqueos por IP activos después del partido | 0 |
-| Órdenes firmadas fuera de turno | 0 (el juez saliente intenta firmar y recibe 403) |
-| Auditoría encadenada | 188 entradas íntegras |
-| Expedientes y capturas | 7 expedientes, 38 capturas con `sha256sum -c` OK |
-| Datos ficticios | 0 IPs fuera de RFC 5737, 0 dominios fuera de `.test`/`.example` |
-| Veredicto | **NÚCLEO OK** |
+| Control | oficial | cambio_turno | reclamo |
+|---|---|---|---|
+| Pruebas de la app web (`node --test`) | OK (15 de 15) | | |
+| Fases piratas bloqueadas | **7 de 7** | 6 de 7 (ver nota) | — |
+| Órdenes recibidas / aplicadas / fallidas y reintentadas / rechazadas | 33 / 30 / 3 / 0 | | |
+| Daño colateral · dominios legítimos afectados · falsos positivos | 0 · 0 · 0 | | esperado (bloqueo IP forzado) |
+| Bloqueos por IP activos después del partido | 0 | | |
+| Órdenes firmadas fuera de turno | 0 | 0 (1 intento rechazado con 403) | |
+| Pendientes reasignados al entrante / firmados por el entrante / por la saliente | | 4 / 7 / 0 | |
+| Reclamo | | | R-001 `noticias-del-valle.test` levantado en 0,5 min |
+| Auditoría encadenada | 188 íntegras | 196 íntegras | 197 íntegras |
+| Expedientes y capturas | 7 y 38 OK | 7 y 38 OK | 7 y 38 OK |
+| Datos ficticios | 0 IPs / 0 dominios fuera de rango | ídem | ídem |
+| Veredicto | **NÚCLEO OK · CAMBIO DE TURNO OK · RECLAMO OK** | | |
 
-La corrida no ejerce reclamos (el escenario de práctica no los trae) ni el cambio de turno con juez ausente. Ver `PRIORIDADES.md`.
+**Nota sobre el cambio de turno.** Con la jueza saliente ausente, `pelotaya` fase 1 (min 2–36) no se bloquea nunca y los streams que arrancan antes del minuto 50 recién se bloquean al entrar el juez (42 a 45 min tarde). La plataforma hace lo correcto (nadie firma por la jueza), pero en la final **cada minuto sin un juez atento cuesta puntos de Velocidad**. Ver `PRIORIDADES.md`.
