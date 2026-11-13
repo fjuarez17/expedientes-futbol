@@ -51,6 +51,7 @@ partido() {
   python3 plataforma/servidor.py --verificar-auditoria "$S/entrega/auditoria.jsonl" > "$S/verificar_auditoria.txt" 2>&1 || true
   python3 plataforma/expedientes.py --verificar "$S/entrega/expedientes.json" > "$S/verificar_expedientes.txt" 2>&1 || true
   python3 plataforma/servidor.py --verificar-sellos "$S/entrega/sellos" > "$S/verificar_sellos.txt" 2>&1 || true
+  python3 plataforma/servidor.py --verificar-firmas "$S/entrega/plataforma.json" > "$S/verificar_firmas.txt" 2>&1 || true
   if [ -f "$S/entrega/evidencia/SHA256SUMS" ]; then
     (cd "$S/entrega/evidencia" && sha256sum -c --quiet SHA256SUMS > /dev/null 2>&1 && echo "OK: $(wc -l < SHA256SUMS) capturas" || echo "FALLA") > "$S/sha256sum.txt"
   else
@@ -78,11 +79,13 @@ integridad() {  # integridad <nombre>: auditoría encadenada, expedientes, captu
   tail -n 1 "$S/verificar_auditoria.txt" | tee -a "$R"
   tail -n 1 "$S/verificar_expedientes.txt" | tee -a "$R"
   tail -n 1 "$S/verificar_sellos.txt" | tee -a "$R"
+  tail -n 1 "$S/verificar_firmas.txt" | tee -a "$R"
   tee -a "$R" < "$S/sha256sum.txt"
   tail -n 2 "$S/datos_ficticios.txt" | tee -a "$R"
   grep -q '^OK' "$S/verificar_auditoria.txt" || falla "$1: auditoría encadenada"
   grep -q '^OK' "$S/verificar_expedientes.txt" || falla "$1: expedientes"
   grep -q '^OK' "$S/verificar_sellos.txt" || falla "$1: sellos de tiempo RFC 3161"
+  grep -q '^OK' "$S/verificar_firmas.txt" || falla "$1: firmas de los jueces desde su dispositivo"
   grep -q '"motivo": "ancla_auditoria"' "$S/entrega/sellos/indice.jsonl" || echo "AVISO $1: sin ancla externa de la auditoría (¿sin internet?)" | tee -a "$R"
   grep -q '^OK' "$S/sha256sum.txt" || falla "$1: hashes de capturas"
   grep -q 'fuera de RFC 5737: 0' "$S/datos_ficticios.txt" || falla "$1: IPs no ficticias"

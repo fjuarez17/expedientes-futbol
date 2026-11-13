@@ -29,6 +29,20 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{padding:5px;borde
 <script>
 const $=s=>document.querySelector(s), app=$('#app'); let vistos=new Set(), primera=true, timer;
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const SEGURO=!!(window.isSecureContext&&window.crypto&&crypto.subtle&&window.indexedDB);let clave=null,preparando=null,porFirmar={},fdisp=true;
+const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
+function idb(){return new Promise((ok,no)=>{const r=indexedDB.open('firma-juez',1);r.onupgradeneeded=()=>r.result.createObjectStore('k');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
+async function idbGet(k){const db=await idb();return new Promise(ok=>{const q=db.transaction('k').objectStore('k').get(k);q.onsuccess=()=>ok(q.result||null);q.onerror=()=>ok(null)})}
+async function idbPut(k,v){const db=await idb();return new Promise((ok,no)=>{const tx=db.transaction('k','readwrite');tx.objectStore('k').put(v,k);tx.oncomplete=()=>ok();tx.onerror=()=>no(tx.error)})}
+// La clave privada se genera en este dispositivo, no es exportable y nunca se manda al servidor.
+async function nuevaClave(){try{const k=await crypto.subtle.generateKey({name:'Ed25519'},false,['sign','verify']);return{alg:'Ed25519',k,pub:b64(await crypto.subtle.exportKey('raw',k.publicKey))}}
+ catch(e){const k=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']);return{alg:'ECDSA-P256',k,pub:b64(await crypto.subtle.exportKey('raw',k.publicKey))}}}
+async function prepararClave(juez,huella){const id='juez:'+juez;let c=await idbGet(id);if(!c){c=await nuevaClave();await idbPut(id,c)}
+ if(c.huella!==huella||!huella){const[s,r]=await api('/api/clave',{alg:c.alg,publica:c.pub});if(s!=200)throw new Error(r.error);c.huella=r.huella;await idbPut(id,c)}clave=c}
+async function firmado(id,op,cuerpo){if(!fdisp)return cuerpo;if(!clave)throw new Error('Este dispositivo no puede firmar: abrí la plataforma por HTTPS (o en esta compu con localhost).');
+ const t=(porFirmar[id]||{})[op];if(!t)throw new Error('No hay texto para firmar.');
+ const f=await crypto.subtle.sign(clave.alg=='Ed25519'?{name:'Ed25519'}:{name:'ECDSA',hash:'SHA-256'},clave.k.privateKey,new TextEncoder().encode(t));
+ return Object.assign({},cuerpo,{firma:b64(f),huella:clave.huella})}
 async function api(u,b){const r=await fetch(u,b?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}:{});return [r.status,await r.json()]}
 function beep(){try{const c=new AudioContext(),o=c.createOscillator();o.frequency.value=880;o.connect(c.destination);o.start();o.stop(c.currentTime+.25)}catch(e){}}
 function avisar(p){const t=p.tipo=='expediente'?`${p.reincidente?'URGENTE, cambió de servidor: ':'Nuevo expediente '}${p.id} (${p.sitio})`:p.tipo=='reclamo'?`Reclamo ${p.id}: ${p.dominio}`:`Reenvío ${p.id} pendiente`;
@@ -63,16 +77,20 @@ function tarjeta(p){
   <div>“${esc(p.mensaje)}”</div><p class="muted">${esc(v.motivo)}</p>
   <div class="acc"><button class="b-ok" onclick="reclamo('${p.id}','aceptar')">Levantar y reemplazar por dominio</button><button class="b-no" onclick="reclamo('${p.id}','rechazar')">Rechazar reclamo</button></div></div>`}
 async function refrescar(){const[s,d]=await api('/api/yo'); if(s==401) return login();
+ fdisp=d.firma_dispositivo;d.pendientes.forEach(p=>porFirmar[p.id]=p.a_firmar);
+ if(fdisp&&SEGURO&&(!clave||clave.huella!==d.clave)&&!preparando)preparando=prepararClave(d.juez.id,d.clave).catch(e=>alert('No se pudo registrar la clave de firma: '+e.message)).finally(()=>preparando=null);
  $('#sub').textContent=`${d.juez.nombre} · minuto ${d.minuto}`;$('#hdr').innerHTML=`<button class="b-sec" onclick="salir()">Salir</button>`;
  const nuevos=d.pendientes.filter(p=>!vistos.has(p.id)); nuevos.forEach(p=>vistos.add(p.id)); if(!primera) nuevos.forEach(avisar); primera=false;
  document.title=(d.pendientes.length?`(${d.pendientes.length}) `:'')+'Órdenes de bloqueo';
  const foco=document.activeElement&&document.activeElement.tagName=='TEXTAREA'; if(foco) return;
  app.innerHTML=`<div class="banner ${d.de_turno?'on':'off'}">${d.de_turno?'De turno: puede firmar.':'Fuera de turno: no puede firmar. Los pendientes pasaron al juez entrante.'}</div>
+ ${fdisp?(SEGURO?`<div class="muted" style="margin:-6px 0 10px">Firma desde este dispositivo: ${clave?esc(clave.alg)+' · huella '+esc(clave.huella):'preparando la clave…'}</div>`:'<div class="banner off">Este navegador no puede firmar: abrí la plataforma por HTTPS (o en esta compu con localhost).</div>'):''}
  <h2>Pendientes (${d.pendientes.length})</h2>${d.pendientes.map(tarjeta).join('')||'<div class="card muted">No hay pendientes.</div>'}
  <h2>Mis decisiones y seguimiento</h2>${d.decididos.map(x=>`<div class="card"><b>${esc(x.expediente_id)}</b> · ${esc(x.sitio)} <span class="tag ${x.decision=='aprobado'?'ok':'no'}">${esc(x.decision)}</span> <span class="muted">min ${x.minuto}</span>
   ${x.envios.length?`<table><tr><th>Proveedor</th><th>Bloqueo</th><th>Estado</th><th>Intentos</th></tr>${x.envios.map(e=>`<tr><td>${esc(e.proveedor)}</td><td>${esc(e.tipo||'—')} ${esc(e.objetivo||'')}</td><td><span class="tag ${e.estado=='aplicada'?'ok':/fallida|rechazada/.test(e.estado)?'no':''}">${esc(e.estado)}</span></td><td>${e.intentos}</td></tr>`).join('')}</table>`:''}</div>`).join('')||'<div class="card muted">Todavía no firmó nada.</div>'}`}
-async function decidir(id,d){const m=($('#m-'+id)||{}).value||'';const[s,r]=await api(`/api/expedientes/${id}/decision`,{decision:d,motivo:m});if(s!=200)alert(r.error);refrescar()}
-async function reenviar(id){const[s,r]=await api(`/api/reenvios/${id}/firmar`,{});if(s!=200)alert(r.error);refrescar()}
-async function reclamo(id,d){const[s,r]=await api(`/api/reclamos/${id}/decision`,{decision:d});if(s!=200)alert(r.error);refrescar()}
+async function enviar(u,id,op,cuerpo){try{const[s,r]=await api(u,await firmado(id,op,cuerpo));if(s!=200)alert(r.error)}catch(e){alert(e.message)}refrescar()}
+function decidir(id,d){const m=($('#m-'+id)||{}).value||'';return enviar(`/api/expedientes/${id}/decision`,id,d,{decision:d,motivo:m})}
+function reenviar(id){return enviar(`/api/reenvios/${id}/firmar`,id,'firmar',{})}
+function reclamo(id,d){return enviar(`/api/reclamos/${id}/decision`,id,d,{decision:d})}
 api('/api/yo').then(([s])=>s==200?iniciar():login());
 </script></body></html>

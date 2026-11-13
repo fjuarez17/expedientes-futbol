@@ -213,15 +213,18 @@ class Puente:
                                exp_sim_id=f"in.({','.join(pend)})")
         for f in filas:
             ref, firmas = f["exp_sim_id"], sorted(f.get("firmas") or [], key=lambda x: x["ts"])
+            externa = {"origen": "app web (Supabase, tabla firmas)", **({"ts": firmas[0]["ts"]} if firmas else {})}
             if firmas:
                 juez = self.juez_sim.get(firmas[0]["juez_id"])
                 if ref.startswith("RE-"):
-                    cod, resp = self.plat.firmar_reenvio(juez, ref)
+                    cod, resp = self.plat.firmar_reenvio(juez, ref, firma_externa=externa)
                 else:
-                    cod, resp = self.plat.decidir_expediente(juez, ref, True, "Firmado por el juez desde la app")
+                    cod, resp = self.plat.decidir_expediente(juez, ref, True, "Firmado por el juez desde la app",
+                                                              firma_externa=externa)
             elif f["estado"] == "rechazado" and not ref.startswith("RE-"):
                 juez = self.plat.tramites[ref]["juez_asignado"]
-                cod, resp = self.plat.decidir_expediente(juez, ref, False, "Rechazado por el juez desde la app")
+                cod, resp = self.plat.decidir_expediente(juez, ref, False, "Rechazado por el juez desde la app",
+                                                              firma_externa=externa)
             else:
                 continue
             if cod != 200:
@@ -277,7 +280,8 @@ class Puente:
         for f in self.sb.select("reclamos", select="rec_sim_id,estado,decidido_por", rec_sim_id=f"in.({','.join(pend)})",
                                 estado="in.(aceptado,rechazado)"):
             juez = self.juez_sim.get(f["decidido_por"])
-            cod, resp = self.plat.decidir_reclamo(juez, f["rec_sim_id"], f["estado"] == "aceptado")
+            cod, resp = self.plat.decidir_reclamo(juez, f["rec_sim_id"], f["estado"] == "aceptado",
+                                                   firma_externa={"origen": "app web (Supabase)"})
             if cod != 200:
                 self.errores["reclamo|" + f["rec_sim_id"]] = "definitivo"
                 self.plat.audit.registrar("reclamo_app_no_aplicado", self.plat.minuto, "sistema", ref=f["rec_sim_id"],

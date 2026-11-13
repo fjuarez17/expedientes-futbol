@@ -16,6 +16,8 @@ import hmac
 import json
 import os
 import secrets
+import ssl
+import subprocess
 import sys
 import threading
 import time
@@ -31,6 +33,7 @@ from urllib.parse import urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import expedientes as ex  # noqa: E402
 import sello_tiempo as st  # noqa: E402
+import firma_juez as fj  # noqa: E402
 
 DIR = Path(__file__).resolve().parent
 REPO_DIR = DIR.parent
@@ -136,11 +139,58 @@ def verificar_auditoria(ruta: Path) -> int:
     return 1 if errores else 0
 
 
+def verificar_firmas(ruta: Path) -> int:
+    """Verifica cada firma de juez de `plataforma.json` con la clave pública que registró su dispositivo."""
+    d = json.loads(ruta.read_text(encoding="utf-8"))
+    claves = {(j, c["huella"]): c for j, v in d["jueces"].items() for c in v.get("claves", [])}
+    items = [(f"decisión {t['expediente_id']}", t["decision"]["juez_id"], t["decision"].get("firma_juez"),
+              ["DECISION", t["expediente_id"], t["decision"]["hash_expediente_firmado"], t["decision"]["decision"],
+               t["decision"]["juez_id"]]) for t in d["tramites"] if t.get("decision")]
+    items += [(f"reenvío {r['id']}", r["firmado_por"], r.get("firma_juez"), ["REENVIO", r["id"]])
+              for r in d["reenvios"] if r.get("firmado_por")]
+    items += [(f"reclamo {r['id']}", r["decidido_por"], r.get("firma_juez"), ["RECLAMO", r["id"], r["dominio"], r["estado"]])
+              for r in d["reclamos"] if r.get("decidido_por")]
+    ok, externas, errores = 0, 0, []
+    for nombre, juez, f, esperado in items:
+        if not f:
+            if d.get("firma_dispositivo"):
+                errores.append(f"{nombre}: sin firma del juez")
+            continue
+        if f.get("origen") != "dispositivo del juez":
+            externas += 1
+            continue
+        c, partes = claves.get((juez, f.get("huella"))), f["texto"].split("|")
+        if partes[:len(esperado)] != esperado or partes[-1] != juez:
+            errores.append(f"{nombre}: el texto firmado no corresponde a la decisión registrada")
+        elif not c or not fj.verificar(c["alg"], c["publica"], f["texto"], f["firma"]):
+            errores.append(f"{nombre}: la firma no verifica con la clave pública del juez")
+        else:
+            ok += 1
+    print("\n".join(errores) if errores else
+          f"OK: {ok} firmas de juez verificadas con la clave pública de su dispositivo"
+          + (f" ({externas} firmadas en la app web)" if externas else ""))
+    return 1 if errores or (d.get("firma_dispositivo") and not ok) else 0
+
+
+def certificado_tls(directorio: Path) -> Tuple[Path, Path]:
+    """Certificado autofirmado para servir HTTPS en la red local (WebCrypto exige contexto seguro)."""
+    directorio.mkdir(parents=True, exist_ok=True)
+    cert, clave = directorio / "cert.pem", directorio / "clave.pem"
+    if not cert.exists():
+        subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "7",
+                        "-subj", "/CN=plataforma-bloqueo", "-keyout", str(clave), "-out", str(cert)],
+                       check=True, capture_output=True)
+    return cert, clave
+
+
 # --- plataforma -----------------------------------------------------------------------
 
 class Plataforma:
-    def __init__(self, base: str, salida: Path, usuarios: Path, juzgados: Path, sellos: bool = True):
+    def __init__(self, base: str, salida: Path, usuarios: Path, juzgados: Path, sellos: bool = True,
+                 firma_dispositivo: bool = True):
         self.base, self.salida = base, salida
+        self.firma_dispositivo = firma_dispositivo
+        self.claves: Dict[str, List[dict]] = {}  # juez_id -> claves públicas registradas por su dispositivo
         self.lock = threading.RLock()
         self.audit = Auditoria(salida / "auditoria.jsonl")
         self.ultima_ancla: Optional[dict] = None
@@ -166,7 +216,8 @@ class Plataforma:
         self.vencimiento_verificado = False
         self.forzar_ip: set = set()
         self.audit.registrar("plataforma_iniciada", None, "sistema", simulador=base,
-                             proveedores=[p["id"] for p in self.proveedores], jueces=list(self.jueces))
+                             proveedores=[p["id"] for p in self.proveedores], jueces=list(self.jueces),
+                             firma_dispositivo=firma_dispositivo)
 
     # -- sellos de tiempo de terceros (RFC 3161)
     def _sello_listo(self, fila: dict) -> None:
@@ -273,6 +324,50 @@ class Plataforma:
                                      juez_saliente=previo, juez_entrante=juez)
                 self.audit.registrar("juez_notificado", self.minuto, "sistema", tipo=tipo, ref=ref, juez_id=juez)
 
+    # -- firma del juez en su dispositivo (la clave privada nunca llega al servidor)
+    def registrar_clave(self, juez_id: str, alg: str, publica: str) -> Tuple[int, dict]:
+        try:
+            crudo = base64.b64decode(publica, validate=True)
+        except ValueError:
+            crudo = b""
+        if alg not in fj.ALGORITMOS or len(crudo) != (32 if alg == "Ed25519" else 65):
+            return 400, {"error": "Clave pública inválida"}
+        with self.lock:
+            huella, lista = fj.huella(alg, publica), self.claves.setdefault(juez_id, [])
+            if lista and lista[-1]["huella"] == huella:
+                return 200, {"ok": True, "huella": huella}
+            evento = "clave_reemplazada" if lista else "clave_registrada"
+            lista.append({"alg": alg, "publica": publica, "huella": huella, "minuto": self.minuto, "utc": ahora_utc()})
+            self.audit.registrar(evento, self.minuto, juez_id, alg=alg, huella=huella, publica=publica)
+            return 200, {"ok": True, "huella": huella}
+
+    def opciones_firma(self, tipo: str, item: dict, juez_id: str) -> Dict[str, str]:
+        """Texto exacto que firma el dispositivo del juez para cada opción del pendiente."""
+        if tipo == "expediente":
+            h = self.expediente(item["expediente_id"])["hash_expediente"]
+            return {op: f"DECISION|{item['expediente_id']}|{h}|{d}|{juez_id}"
+                    for op, d in (("aprobar", "aprobado"), ("rechazar", "rechazado"))}
+        if tipo == "reenvio":
+            return {"firmar": f"REENVIO|{item['id']}|{item['expediente_id']}|{item['tipo']}|{item['objetivo']}|{juez_id}"}
+        return {op: f"RECLAMO|{item['id']}|{item['dominio']}|{d}|{juez_id}"
+                for op, d in (("aceptar", "aceptado"), ("rechazar", "rechazado"))}
+
+    def comprobar_firma(self, juez_id: str, texto: str, cuerpo: Optional[dict],
+                        externa: Optional[dict]) -> Tuple[Optional[str], Optional[dict]]:
+        if externa is not None:  # firmada en la app web (Supabase, tabla `firmas`)
+            return None, dict(externa, texto=texto)
+        if not self.firma_dispositivo:
+            return None, None
+        cuerpo = cuerpo or {}
+        claves = self.claves.get(juez_id) or []
+        if not claves:
+            return "Este dispositivo todavía no registró su clave de firma.", None
+        c, firma = claves[-1], str(cuerpo.get("firma") or "")
+        if cuerpo.get("huella") != c["huella"] or not fj.verificar(c["alg"], c["publica"], texto, firma):
+            return "La firma del dispositivo del juez no verifica.", None
+        return None, {"origen": "dispositivo del juez", "alg": c["alg"], "huella": c["huella"], "texto": texto,
+                      "firma": firma}
+
     # -- decisiones judiciales
     def puede_firmar(self, juez_id: str, item: dict) -> Optional[str]:
         if juez_id not in self.de_turno:
@@ -283,7 +378,8 @@ class Plataforma:
             return "Ya fue resuelto."
         return None
 
-    def decidir_expediente(self, juez_id: str, exp_id: str, aprobar: bool, motivo: str) -> Tuple[int, dict]:
+    def decidir_expediente(self, juez_id: str, exp_id: str, aprobar: bool, motivo: str, cuerpo: Optional[dict] = None,
+                           firma_externa: Optional[dict] = None) -> Tuple[int, dict]:
         with self.lock:
             t, exp = self.tramites.get(exp_id), self.expediente(exp_id)
             if not t or not exp:
@@ -294,14 +390,19 @@ class Plataforma:
                 return 403, {"error": error}
             juez = self.jueces[juez_id]
             decision = "aprobado" if aprobar else "rechazado"
-            texto = f"DECISION|{exp_id}|{exp['hash_expediente']}|{decision}|{juez_id}"
+            texto = self.opciones_firma("expediente", t, juez_id)["aprobar" if aprobar else "rechazar"]
+            error, firma_juez = self.comprobar_firma(juez_id, texto, cuerpo, firma_externa)
+            if error:
+                self.audit.registrar("firma_rechazada", self.minuto, juez_id, expediente_id=exp_id, motivo=error)
+                return 403, {"error": error}
             t["decision"] = {"decision": decision, "juez_id": juez_id, "juez": juez["nombre"],
                              "juzgado_id": juez["juzgado_id"], "juzgado": juez["juzgado"], "minuto": self.minuto,
                              "utc": ahora_utc(), "motivo": motivo, "hash_expediente_firmado": exp["hash_expediente"],
-                             "texto_firmado": texto, "firma": firmar(juez["_clave"], texto)}
+                             "texto_firmado": texto, "firma": firmar(juez["_clave"], texto), "firma_juez": firma_juez}
             t["estado"] = decision
             self.audit.registrar("decision_firmada", self.minuto, juez_id, expediente_id=exp_id, decision=decision,
-                                 motivo=motivo, hash_expediente=exp["hash_expediente"], firma=t["decision"]["firma"])
+                                 motivo=motivo, hash_expediente=exp["hash_expediente"], firma=t["decision"]["firma"],
+                                 firma_juez=firma_juez and {k: firma_juez.get(k) for k in ("origen", "alg", "huella", "firma")})
             self.sellador.pedir(ex.sha256(ex.canonico(t["decision"])), f"{exp_id}-decision", "decision",
                                 expediente_id=exp_id, juez_id=juez_id)
             if aprobar:
@@ -388,13 +489,18 @@ class Plataforma:
         self.audit.registrar("reenvio_pendiente", self.minuto, "sistema", id=rid, expediente_id=t["expediente_id"],
                              proveedor=envio["proveedor"], juez_id=juez)
 
-    def firmar_reenvio(self, juez_id: str, rid: str) -> Tuple[int, dict]:
+    def firmar_reenvio(self, juez_id: str, rid: str, cuerpo: Optional[dict] = None,
+                       firma_externa: Optional[dict] = None) -> Tuple[int, dict]:
         with self.lock:
             r = self.reenvios.get(rid)
             if not r:
                 return 404, {"error": "Reenvío inexistente"}
             error = self.puede_firmar(juez_id, r)
+            if not error:
+                error, firma_juez = self.comprobar_firma(juez_id, self.opciones_firma("reenvio", r, juez_id)["firmar"],
+                                                         cuerpo, firma_externa)
             if error:
+                self.audit.registrar("firma_rechazada", self.minuto, juez_id, id=rid, motivo=error)
                 return 403, {"error": error}
             t = self.tramites[r["expediente_id"]]
             envio, juez = t["envios"][r["envio_idx"]], self.jueces[juez_id]
@@ -403,8 +509,9 @@ class Plataforma:
                  "juez_id": juez_id}
             o["firma"] = firmar(juez["_clave"], self.mensaje_orden(o))
             envio["_reservas"] = []
-            r.update(estado="firmado", firmado_por=juez_id, firmado_min=self.minuto)
-            self.audit.registrar("reenvio_firmado", self.minuto, juez_id, id=rid, orden_id=o["orden_id"])
+            r.update(estado="firmado", firmado_por=juez_id, firmado_min=self.minuto, firma_juez=firma_juez)
+            self.audit.registrar("reenvio_firmado", self.minuto, juez_id, id=rid, orden_id=o["orden_id"],
+                                 huella_firma_juez=(firma_juez or {}).get("huella"))
             self.enviar(t, envio, o)
             return 200, {"ok": True}
 
@@ -486,17 +593,24 @@ class Plataforma:
             if valido else "El dominio pertenece a un sitio pirata o no lo afecta ninguna orden nuestra.")
         return {"valido": valido, "licenciatario": licenciatario, "afectado_por": afectan, "motivo": motivo}
 
-    def decidir_reclamo(self, juez_id: str, rid: str, aceptar: bool) -> Tuple[int, dict]:
+    def decidir_reclamo(self, juez_id: str, rid: str, aceptar: bool, cuerpo: Optional[dict] = None,
+                        firma_externa: Optional[dict] = None) -> Tuple[int, dict]:
         with self.lock:
             rec = self.reclamos.get(rid)
             if not rec:
                 return 404, {"error": "Reclamo inexistente"}
             error = self.puede_firmar(juez_id, rec)
+            if not error:
+                texto = self.opciones_firma("reclamo", rec, juez_id)["aceptar" if aceptar else "rechazar"]
+                error, firma_juez = self.comprobar_firma(juez_id, texto, cuerpo, firma_externa)
             if error:
+                self.audit.registrar("firma_rechazada", self.minuto, juez_id, id=rid, motivo=error)
                 return 403, {"error": error}
             juez = self.jueces[juez_id]
-            rec.update(estado="aceptado" if aceptar else "rechazado", decidido_por=juez_id, decidido_min=self.minuto)
-            self.audit.registrar("reclamo_decidido", self.minuto, juez_id, id=rid, aceptado=aceptar)
+            rec.update(estado="aceptado" if aceptar else "rechazado", decidido_por=juez_id, decidido_min=self.minuto,
+                       firma_juez=firma_juez)
+            self.audit.registrar("reclamo_decidido", self.minuto, juez_id, id=rid, aceptado=aceptar,
+                                 huella_firma_juez=(firma_juez or {}).get("huella"))
             if not aceptar:
                 return 200, {"ok": True}
             levantadas, reemplazos = [], []
@@ -571,7 +685,8 @@ class Plataforma:
 
     def vista_juez(self, juez_id: str) -> dict:
         with self.lock:
-            pendientes = [self.resumen_item(tp, it) for tp, it in self.pendientes_de() if it["juez_asignado"] == juez_id]
+            pendientes = [dict(self.resumen_item(tp, it), a_firmar=self.opciones_firma(tp, it, juez_id))
+                          for tp, it in self.pendientes_de() if it["juez_asignado"] == juez_id]
             decididos = [{"expediente_id": t["expediente_id"], "sitio": t["sitio"], "decision": t["decision"]["decision"],
                           "minuto": t["decision"]["minuto"],
                           "envios": [{"proveedor": e["proveedor"], "tipo": e["tipo"], "objetivo": e["objetivo"],
@@ -580,13 +695,17 @@ class Plataforma:
             j = self.jueces[juez_id]
             return {"juez": {"id": juez_id, "nombre": j["nombre"], "juzgado": j["juzgado"]},
                     "de_turno": juez_id in self.de_turno, "minuto": self.minuto, "pendientes": pendientes,
+                    "firma_dispositivo": self.firma_dispositivo,
+                    "clave": (self.claves.get(juez_id) or [{}])[-1].get("huella"),
                     "decididos": decididos}
 
     def exportar(self) -> None:
         ex.exportar(self.arm, self.salida)
         limpio = lambda t: dict(t, envios=[{k: v for k, v in e.items() if not k.startswith("_")} for e in t["envios"]])
         datos = {"generado_utc": ahora_utc(), "minuto": self.minuto, "finalizado": self.finalizado,
-                 "jueces": {k: {kk: vv for kk, vv in v.items() if not kk.startswith("_")} for k, v in self.jueces.items()},
+                 "jueces": {k: dict({kk: vv for kk, vv in v.items() if not kk.startswith("_")}, claves=self.claves.get(k, []))
+                            for k, v in self.jueces.items()},
+                 "firma_dispositivo": self.firma_dispositivo,
                  "proveedores": self.proveedores, "tramites": [limpio(t) for t in self.tramites.values()],
                  "reenvios": list(self.reenvios.values()), "reclamos": list(self.reclamos.values()),
                  "transparencia": self.transparencia(), "vencimiento_verificado": self.vencimiento_verificado,
@@ -711,11 +830,13 @@ class Manejador(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True}, {"Set-Cookie": "sid=; Max-Age=0; Path=/"})
         if len(partes) == 4 and partes[1] == "expedientes" and partes[3] == "decision":
             return self._json(*p.decidir_expediente(juez, partes[2], cuerpo.get("decision") == "aprobar",
-                                                    str(cuerpo.get("motivo", ""))[:500]))
+                                                    str(cuerpo.get("motivo", ""))[:500], cuerpo))
         if len(partes) == 4 and partes[1] == "reenvios" and partes[3] == "firmar":
-            return self._json(*p.firmar_reenvio(juez, partes[2]))
+            return self._json(*p.firmar_reenvio(juez, partes[2], cuerpo))
         if len(partes) == 4 and partes[1] == "reclamos" and partes[3] == "decision":
-            return self._json(*p.decidir_reclamo(juez, partes[2], cuerpo.get("decision") == "aceptar"))
+            return self._json(*p.decidir_reclamo(juez, partes[2], cuerpo.get("decision") == "aceptar", cuerpo))
+        if ruta == "/api/clave":
+            return self._json(*p.registrar_clave(juez, str(cuerpo.get("alg", "")), str(cuerpo.get("publica", ""))))
         self._json(404, {"error": "No existe"})
 
 
@@ -731,6 +852,12 @@ def main() -> None:
     a.add_argument("--verificar-sellos", type=Path, metavar="DIR_SELLOS",
                    help="comprueba los sellos RFC 3161 de <salida>/sellos contra sus hashes y la auditoría")
     a.add_argument("--sin-sellos", action="store_true", help="no pedir sellos RFC 3161 (sin internet)")
+    a.add_argument("--verificar-firmas", type=Path, metavar="PLATAFORMA_JSON",
+                   help="verifica las firmas de los jueces con las claves públicas de sus dispositivos")
+    a.add_argument("--sin-firma-dispositivo", action="store_true",
+                   help="plan B: aceptar decisiones sin firma del dispositivo del juez (queda en la auditoría)")
+    a.add_argument("--https", action="store_true",
+                   help="servir por HTTPS con certificado autofirmado (para firmar desde celulares en la red local)")
     a.add_argument("--forzar-bloqueo-ip", action="append", default=[], metavar="HOST",
                    help="solo para probar reclamos: pide IP para este host aunque la IP sea compartida")
     a.add_argument("--supabase-url", default=os.environ.get("SUPABASE_URL"),
@@ -738,9 +865,12 @@ def main() -> None:
     args = a.parse_args()
     if args.verificar_auditoria:
         sys.exit(verificar_auditoria(args.verificar_auditoria))
+    if args.verificar_firmas:
+        sys.exit(verificar_firmas(args.verificar_firmas))
     if args.verificar_sellos:
         sys.exit(st.verificar_sellos(args.verificar_sellos, args.verificar_sellos.parent / "auditoria.jsonl"))
-    plat = Plataforma(args.simulador.rstrip("/"), args.salida, args.usuarios, args.juzgados, sellos=not args.sin_sellos)
+    plat = Plataforma(args.simulador.rstrip("/"), args.salida, args.usuarios, args.juzgados, sellos=not args.sin_sellos,
+                      firma_dispositivo=not args.sin_firma_dispositivo)
     plat.forzar_ip = set(args.forzar_bloqueo_ip)
     if plat.forzar_ip:
         plat.audit.registrar("modo_prueba_reclamos", None, "sistema", forzar_bloqueo_ip=sorted(plat.forzar_ip))
@@ -766,7 +896,13 @@ def main() -> None:
 
     threading.Thread(target=bucle, daemon=True).start()
     print(f"Plataforma en http://0.0.0.0:{args.puerto}  (juez: /  ·  transparencia: /publico)", flush=True)
-    ThreadingHTTPServer(("0.0.0.0", args.puerto), Manejador).serve_forever()
+    servidor = ThreadingHTTPServer(("0.0.0.0", args.puerto), Manejador)
+    if args.https:
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(*certificado_tls(args.salida / "tls"))
+        servidor.socket = ctx.wrap_socket(servidor.socket, server_side=True)
+        print(f"HTTPS activo: https://<ip-de-esta-compu>:{args.puerto}/ (aceptar el certificado autofirmado)", flush=True)
+    servidor.serve_forever()
 
 
 if __name__ == "__main__":

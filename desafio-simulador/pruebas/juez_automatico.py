@@ -7,9 +7,15 @@ También intenta firmar fuera de turno para comprobar que la plataforma lo recha
 import argparse
 import http.cookiejar
 import json
+import os
+import sys
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "plataforma"))
+import firma_juez as fj  # noqa: E402
 
 USUARIOS = {"laura": "laura-demo-2026", "martin": "martin-demo-2026"}
 
@@ -18,7 +24,18 @@ class Sesion:
     def __init__(self, base, usuario, clave):
         self.base = base
         self.op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
-        print(usuario, "login:", self.post("/api/login", {"usuario": usuario, "clave": clave}))
+        cod, r = self.post("/api/login", {"usuario": usuario, "clave": clave})
+        print(usuario, "login:", (cod, r))
+        # Como el navegador del juez: la clave privada se genera acá y solo se manda la pública.
+        self.semilla, self.huella = os.urandom(32), None
+        if cod == 200:
+            c, rr = self.post("/api/clave", {"alg": "Ed25519", "publica": fj.b64(fj.ed25519_publica(self.semilla))})
+            self.huella = rr.get("huella")
+            print(usuario, "clave registrada:", c, self.huella)
+
+    def firmado(self, p, opcion, cuerpo):
+        texto = p["a_firmar"][opcion]
+        return dict(cuerpo, firma=fj.b64(fj.ed25519_firmar(self.semilla, texto.encode())), huella=self.huella)
 
     def req(self, ruta, cuerpo=None):
         r = urllib.request.Request(self.base + ruta, data=json.dumps(cuerpo).encode() if cuerpo is not None else None,
@@ -49,19 +66,20 @@ def main():
             for p in ([] if u == args.ausente else yo["pendientes"]):
                 time.sleep(args.demora)
                 if p["tipo"] == "expediente":
-                    r = ses.post(f"/api/expedientes/{p['id']}/decision", {"decision": "aprobar",
-                                 "motivo": "Señal oficial verificada; pedido proporcional según riesgo colateral."})
+                    r = ses.post(f"/api/expedientes/{p['id']}/decision", ses.firmado(p, "aprobar", {"decision": "aprobar",
+                                 "motivo": "Señal oficial verificada; pedido proporcional según riesgo colateral."}))
                 elif p["tipo"] == "reenvio":
-                    r = ses.post(f"/api/reenvios/{p['id']}/firmar", {})
+                    r = ses.post(f"/api/reenvios/{p['id']}/firmar", ses.firmado(p, "firmar", {}))
                 else:
-                    r = ses.post(f"/api/reclamos/{p['id']}/decision",
-                                 {"decision": "aceptar" if p["verificacion"]["valido"] else "rechazar"})
+                    op = "aceptar" if p["verificacion"]["valido"] else "rechazar"
+                    r = ses.post(f"/api/reclamos/{p['id']}/decision", ses.firmado(p, op, {"decision": op}))
                 print(f"[min {yo['minuto']}] {u} {p['tipo']} {p['id']}: {r}", flush=True)
             if not yo["de_turno"] and not probado_fuera and u == "laura":
                 otro = s["martin"].req("/api/yo")[1]["pendientes"]
                 if otro:
                     print("laura fuera de turno intenta firmar:",
-                          ses.post(f"/api/expedientes/{otro[0]['id']}/decision", {"decision": "aprobar"}), flush=True)
+                          ses.post(f"/api/expedientes/{otro[0]['id']}/decision",
+                                   ses.firmado(otro[0], "aprobar", {"decision": "aprobar"})), flush=True)
                     probado_fuera = True
         time.sleep(0.5)
 
