@@ -1,0 +1,50 @@
+TAP version 13
+# Subtest: el regex acepta el formato exacto y normaliza mayúsculas y espacios
+ok 1 - el regex acepta el formato exacto y normaliza mayúsculas y espacios
+  ---
+  duration_ms: 1.795965
+  ...
+# Subtest: el regex rechaza variantes de formato
+ok 2 - el regex rechaza variantes de formato
+  ---
+  duration_ms: 0.173061
+  ...
+# Subtest: el dígito de control es el SHA-256 del resto, igual que en app.js
+ok 3 - el dígito de control es el SHA-256 del resto, igual que en app.js
+  ---
+  duration_ms: 0.178334
+  ...
+# Subtest: cambiar cualquier carácter hex del payload rompe el control (422)
+ok 4 - cambiar cualquier carácter hex del payload rompe el control (422)
+  ---
+  duration_ms: 0.428754
+  ...
+# Subtest: verifyPayload: 200 emitido, 403 no autorizado, 422 control, 400 formato
+ok 5 - verifyPayload: 200 emitido, 403 no autorizado, 422 control, 400 formato
+  ---
+  duration_ms: 0.398361
+  ...
+# Subtest: cada tipo de payload simulado obtiene el código esperado
+ok 6 - cada tipo de payload simulado obtiene el código esperado
+  ---
+  duration_ms: 5.569859
+  ...
+# Subtest: POST /api/verify-mark responde con el código HTTP de cada caso
+ok 7 - POST /api/verify-mark responde con el código HTTP de cada caso
+  ---
+  duration_ms: 3.43385
+  ...
+# Subtest: GET /api/mock-payloads emite payloads con la estructura del detector
+ok 8 - GET /api/mock-payloads emite payloads con la estructura del detector
+  ---
+  duration_ms: 1.26151
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 53.973884

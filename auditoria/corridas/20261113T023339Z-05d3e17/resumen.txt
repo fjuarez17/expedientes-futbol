@@ -1,0 +1,47 @@
+commit: 05d3e17d4c152b48b137ee5724aa72b990073e34
+archivos modificados sin commit (fuera de auditoria/): 0
+fecha UTC: 2026-11-13T02:33:39Z
+aceleracion: x30
+
+== 1. Pruebas unitarias de la app web (node --test)
+OK
+
+== 2. Partido de práctica completo contra el simulador oficial
+registro del simulador: 99 eventos
+
+== 3. Evaluación oficial (evaluacion/verificar.py)
+Resumen
+  fases piratas bloqueadas: 7 de 7
+  visibilidad residual promedio pct: 3.9
+  ordenes recibidas: 33
+  ordenes aplicadas: 30
+  ordenes fallidas: 3
+  ordenes rechazadas: 0
+  bloqueos con dano colateral: 0
+  dominios legitimos afectados: 0
+  bloqueos falsos positivos: 0
+  bloqueos ip activos post partido: 0
+  reclamos: 0
+  reclamos resueltos por levantamiento: 0
+  ordenes firmadas fuera de turno: 0
+
+
+== 4. Integridad de la auditoría encadenada
+OK: 188 entradas de auditoría íntegras. Hash final 72a93107907e608f111977a922969343dd3ff0985ddebec167d1d4cb0cc572d3
+
+== 5. Integridad de los expedientes
+OK: 7 expedientes y 38 evidencias íntegras.
+
+== 6. Hashes de las capturas (sha256sum -c)
+OK: 38 capturas
+
+== 7. Datos ficticios (dominios .test/.example, IPs RFC 5737)
+archivos revisados: 28
+IPs fuera de RFC 5737: 0
+dominios fuera de .test/.example: 0
+
+== 8. Huella de la corrida
+sha256 del manifiesto: 9e87b003a542868c4ce795d02f256403e6d989943ee9e1615715de6f081074ec
+
+== 9. Veredicto del núcleo
+NÚCLEO OK

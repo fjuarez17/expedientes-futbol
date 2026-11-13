@@ -1,0 +1,27 @@
+name: auditoria
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  partido-de-practica:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Partido de práctica contra el simulador oficial + evaluación
+        run: auditoria/correr.sh 30
+      - name: Resumen
+        if: always()
+        run: cat auditoria/corridas/*/resumen.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: corrida-auditoria-${{ github.sha }}
+          path: auditoria/corridas/
