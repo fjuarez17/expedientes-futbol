@@ -68,6 +68,12 @@ el motor levanta la orden en cada proveedor y la reemplaza por un bloqueo por do
    - Si el juez que firmó ya salió de turno, el reenvío lo firma el entrante.
 4. **Vencimiento**: todas las órdenes vencen en el minuto 105. Después del partido se verifica que no quede ningún bloqueo por IP activo.
 5. **Auditoría**: `entrega/auditoria.jsonl`, encadenada con SHA-256. Se verifica con `python plataforma/servidor.py --verificar-auditoria entrega/auditoria.jsonl`.
+6. **Sellos de tiempo de terceros (RFC 3161)**: `sello_tiempo.py` pide en segundo plano un sello a FreeTSA (Sectigo de respaldo, ambas por HTTPS) para el `hash_encadenado` de cada evidencia, para cada decisión firmada y para la cabecera de la auditoría cada 25 entradas y al final del partido. Los `.tsr` quedan en `entrega/sellos/` con su `indice.jsonl`, y cada sello queda en la auditoría (`sello_tiempo`). La última ancla se muestra en `/publico`. Sin internet, el intento queda como `sello_fallido` y el circuito sigue igual (`--sin-sellos` lo apaga). Verificación:
+   ```bash
+   python plataforma/servidor.py --verificar-sellos entrega/sellos      # hash dentro de cada sello y anclas = entradas de la auditoría
+   openssl ts -reply -in entrega/sellos/auditoria-00025.tsr -text       # hora oficial y hash sellado
+   openssl ts -verify -digest <sha256> -in entrega/sellos/<archivo>.tsr -CAfile cacert.pem -untrusted tsa.crt   # firma de FreeTSA
+   ```
 6. **Extras**:
    - Reclamos: verificación por DNS pasivo, levantamiento firmado y reemplazo por dominio.
    - Registro público.

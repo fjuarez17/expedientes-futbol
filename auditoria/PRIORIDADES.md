@@ -17,8 +17,8 @@ Cada punto dice cómo se va a comprobar que quedó resuelto. Se cierra cuando ha
 
 ## P1 · Solidez de la evidencia (lo que va a preguntar un jurado o un juez)
 
-5. **Anclar la cabecera de la auditoría afuera del servidor.** Sellar con RFC 3161 el último hash cada N eventos y al final del partido, y mostrarlo en el registro público. Sin esto, alguien con acceso al disco puede reescribir el archivo entero.
-6. **Sello de tiempo de terceros en el motor.** Las capturas del motor se encadenan con la hora del propio servidor. Reutilizar el sellado RFC 3161 de la app web (`api/timestamp.js`, FreeTSA con Sectigo de respaldo) sobre el hash de cada expediente.
+5. ~~**Anclar la cabecera de la auditoría afuera del servidor.**~~ **Hecho:** `sello_tiempo.py`, ancla cada 25 entradas y al final, visible en `/publico`. Sellar con RFC 3161 el último hash cada N eventos y al final del partido, y mostrarlo en el registro público. Sin esto, alguien con acceso al disco puede reescribir el archivo entero.
+6. ~~**Sello de tiempo de terceros en el motor.**~~ **Hecho:** cada evidencia (`hash_encadenado`) y cada decisión firmada. Las capturas del motor se encadenan con la hora del propio servidor. Reutilizar el sellado RFC 3161 de la app web (`api/timestamp.js`, FreeTSA con Sectigo de respaldo) sobre el hash de cada expediente.
 7. **Firma del juez.** El motor firma con HMAC y la clave queda en el servidor, así que no prueba que firmó el juez. Pasar a Ed25519 con la clave del lado del juez, como en la app web, o declararlo como limitación del MVP en la demo.
 8. **Consenso del lado del servidor en la app web.** Hoy el oráculo corre en el navegador del reportante. Moverlo a una función (`api/`) o a una política de Supabase.
 

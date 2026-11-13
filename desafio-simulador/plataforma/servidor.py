@@ -30,6 +30,7 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import expedientes as ex  # noqa: E402
+import sello_tiempo as st  # noqa: E402
 
 DIR = Path(__file__).resolve().parent
 REPO_DIR = DIR.parent
@@ -70,8 +71,10 @@ def hash_clave(clave: str, sal: str) -> str:
 class Auditoria:
     """Registro append-only: cada entrada incluye el hash de la anterior."""
 
-    def __init__(self, ruta: Path):
+    def __init__(self, ruta: Path, anclar_cada: int = 25):
         self.ruta = ruta
+        self.anclar_cada = anclar_cada
+        self.anclar = None  # callback(n, hash): pide un sello RFC 3161 sobre la cabecera de la cadena
         ruta.parent.mkdir(parents=True, exist_ok=True)
         ruta.write_text("", encoding="utf-8")
         self.previo = "0" * 64
@@ -87,6 +90,8 @@ class Auditoria:
             self.previo = entrada["hash"]
             with self.ruta.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(entrada, ensure_ascii=False) + "\n")
+            if self.anclar and self.n % self.anclar_cada == 0:
+                self.anclar(self.n, entrada["hash"])
             return entrada
 
 
@@ -134,10 +139,13 @@ def verificar_auditoria(ruta: Path) -> int:
 # --- plataforma -----------------------------------------------------------------------
 
 class Plataforma:
-    def __init__(self, base: str, salida: Path, usuarios: Path, juzgados: Path):
+    def __init__(self, base: str, salida: Path, usuarios: Path, juzgados: Path, sellos: bool = True):
         self.base, self.salida = base, salida
         self.lock = threading.RLock()
         self.audit = Auditoria(salida / "auditoria.jsonl")
+        self.ultima_ancla: Optional[dict] = None
+        self.sellador = st.Sellador(salida / "sellos", self._sello_listo, activo=sellos)
+        self.audit.anclar = lambda n, h: self.sellador.pedir(h, f"auditoria-{n:05d}", "ancla_auditoria", entrada=n)
         self.arm = ex.Armador(base)
         self.proveedores: List[dict] = http(base, "/proveedores")[1]
         jz = json.loads(juzgados.read_text(encoding="utf-8"))
@@ -159,6 +167,15 @@ class Plataforma:
         self.forzar_ip: set = set()
         self.audit.registrar("plataforma_iniciada", None, "sistema", simulador=base,
                              proveedores=[p["id"] for p in self.proveedores], jueces=list(self.jueces))
+
+    # -- sellos de tiempo de terceros (RFC 3161)
+    def _sello_listo(self, fila: dict) -> None:
+        if fila["ok"] and fila["motivo"] == "ancla_auditoria":
+            self.ultima_ancla = {k: fila.get(k) for k in ("entrada", "sha256", "tsa", "hora_sello", "archivo")}
+        datos = {k: v for k, v in fila.items() if k not in ("fallidos",)}
+        if not fila["ok"]:
+            datos["fallidos"] = fila["fallidos"]
+        self.audit.registrar("sello_tiempo" if fila["ok"] else "sello_fallido", self.minuto, "tsa", **datos)
 
     # -- utilidades
     def juez_de_turno(self) -> Optional[str]:
@@ -213,6 +230,8 @@ class Plataforma:
                 self.audit.registrar("evidencia_agregada", det["minuto"], "sistema", deteccion_id=det["id"],
                                      expediente_id=exp["expediente_id"], sha256_captura=ev["sha256_captura"],
                                      hash_encadenado=ev["hash_encadenado"])
+                self.sellador.pedir(ev["hash_encadenado"], f"{exp['expediente_id']}-{det['id']}", "evidencia",
+                                    expediente_id=exp["expediente_id"], deteccion_id=det["id"])
                 if clave not in antes:
                     self.abrir_tramite(exp, det["minuto"])
             self.desde_det = r.get("minuto_actual", self.desde_det)
@@ -283,6 +302,8 @@ class Plataforma:
             t["estado"] = decision
             self.audit.registrar("decision_firmada", self.minuto, juez_id, expediente_id=exp_id, decision=decision,
                                  motivo=motivo, hash_expediente=exp["hash_expediente"], firma=t["decision"]["firma"])
+            self.sellador.pedir(ex.sha256(ex.canonico(t["decision"])), f"{exp_id}-decision", "decision",
+                                expediente_id=exp_id, juez_id=juez_id)
             if aprobar:
                 self.preparar_envios(t, exp, juez)
                 self.emitir_avisos(t, exp)
@@ -420,6 +441,8 @@ class Plataforma:
             self.vencimiento_verificado = True
             self.audit.registrar("vencimiento_verificado", self.minuto, "sistema",
                                  detalle="Ningún bloqueo por IP sigue activo después del partido.")
+            self.sellador.pedir(self.audit.previo, f"auditoria-{self.audit.n:05d}-final", "ancla_auditoria",
+                                entrada=self.audit.n)
 
     # -- reclamos
     def leer_reclamos(self) -> None:
@@ -567,7 +590,10 @@ class Plataforma:
                  "proveedores": self.proveedores, "tramites": [limpio(t) for t in self.tramites.values()],
                  "reenvios": list(self.reenvios.values()), "reclamos": list(self.reclamos.values()),
                  "transparencia": self.transparencia(), "vencimiento_verificado": self.vencimiento_verificado,
-                 "auditoria": {"archivo": "auditoria.jsonl", "entradas": self.audit.n, "hash_final": self.audit.previo}}
+                 "auditoria": {"archivo": "auditoria.jsonl", "entradas": self.audit.n, "hash_final": self.audit.previo,
+                               "ultima_ancla_rfc3161": self.ultima_ancla},
+                 "sellos": {"directorio": "sellos/", "otorgados": self.sellador.otorgados,
+                            "fallidos": self.sellador.fallidos, "pendientes": self.sellador.pendientes()}}
         tmp = self.salida / "plataforma.json.tmp"
         tmp.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
         tmp.replace(self.salida / "plataforma.json")
@@ -633,7 +659,9 @@ class Manejador(BaseHTTPRequestHandler):
                 return self._json(200, {"minuto": p.minuto, "partido": p.arm.partido.get("nombre"),
                                         "ordenes": p.transparencia(),
                                         "reclamos": [{k: r.get(k) for k in ("id", "dominio", "estado", "minuto")}
-                                                     for r in p.reclamos.values()]})
+                                                     for r in p.reclamos.values()],
+                                        "auditoria": {"entradas": p.audit.n, "hash_cabecera": p.audit.previo,
+                                                      "ultima_ancla_rfc3161": p.ultima_ancla}})
         juez = self._juez()
         if not juez:
             return self._json(401, {"error": "Iniciá sesión"})
@@ -700,6 +728,9 @@ def main() -> None:
     a.add_argument("--juzgados", type=Path, default=REPO_DIR / "datos" / "juzgados.json")
     a.add_argument("--intervalo", type=float, default=0.5)
     a.add_argument("--verificar-auditoria", type=Path)
+    a.add_argument("--verificar-sellos", type=Path, metavar="DIR_SELLOS",
+                   help="comprueba los sellos RFC 3161 de <salida>/sellos contra sus hashes y la auditoría")
+    a.add_argument("--sin-sellos", action="store_true", help="no pedir sellos RFC 3161 (sin internet)")
     a.add_argument("--forzar-bloqueo-ip", action="append", default=[], metavar="HOST",
                    help="solo para probar reclamos: pide IP para este host aunque la IP sea compartida")
     a.add_argument("--supabase-url", default=os.environ.get("SUPABASE_URL"),
@@ -707,7 +738,9 @@ def main() -> None:
     args = a.parse_args()
     if args.verificar_auditoria:
         sys.exit(verificar_auditoria(args.verificar_auditoria))
-    plat = Plataforma(args.simulador.rstrip("/"), args.salida, args.usuarios, args.juzgados)
+    if args.verificar_sellos:
+        sys.exit(st.verificar_sellos(args.verificar_sellos, args.verificar_sellos.parent / "auditoria.jsonl"))
+    plat = Plataforma(args.simulador.rstrip("/"), args.salida, args.usuarios, args.juzgados, sellos=not args.sin_sellos)
     plat.forzar_ip = set(args.forzar_bloqueo_ip)
     if plat.forzar_ip:
         plat.audit.registrar("modo_prueba_reclamos", None, "sistema", forzar_bloqueo_ip=sorted(plat.forzar_ip))

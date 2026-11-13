@@ -43,13 +43,14 @@ partido() {
   pids+=($!)
   # El juez automático no termina solo: se espera el fin del partido y unos segundos para el control de vencimiento.
   until curl -sf "http://localhost:$SP/estado" | grep -q '"finalizado": true'; do sleep 5; done
-  sleep 10
+  sleep 20
   kill "${pids[@]}" 2>/dev/null || true
   sleep 1
   python3 evaluacion/verificar.py --log "$S/registro_simulador.jsonl" > "$S/evaluacion.txt" 2>&1 || true
   python3 evaluacion/verificar.py --log "$S/registro_simulador.jsonl" --json > "$S/evaluacion.json" 2>/dev/null || true
   python3 plataforma/servidor.py --verificar-auditoria "$S/entrega/auditoria.jsonl" > "$S/verificar_auditoria.txt" 2>&1 || true
   python3 plataforma/expedientes.py --verificar "$S/entrega/expedientes.json" > "$S/verificar_expedientes.txt" 2>&1 || true
+  python3 plataforma/servidor.py --verificar-sellos "$S/entrega/sellos" > "$S/verificar_sellos.txt" 2>&1 || true
   if [ -f "$S/entrega/evidencia/SHA256SUMS" ]; then
     (cd "$S/entrega/evidencia" && sha256sum -c --quiet SHA256SUMS > /dev/null 2>&1 && echo "OK: $(wc -l < SHA256SUMS) capturas" || echo "FALLA") > "$S/sha256sum.txt"
   else
@@ -76,10 +77,13 @@ integridad() {  # integridad <nombre>: auditoría encadenada, expedientes, captu
   local S="$SAL/$1"
   tail -n 1 "$S/verificar_auditoria.txt" | tee -a "$R"
   tail -n 1 "$S/verificar_expedientes.txt" | tee -a "$R"
+  tail -n 1 "$S/verificar_sellos.txt" | tee -a "$R"
   tee -a "$R" < "$S/sha256sum.txt"
   tail -n 2 "$S/datos_ficticios.txt" | tee -a "$R"
   grep -q '^OK' "$S/verificar_auditoria.txt" || falla "$1: auditoría encadenada"
   grep -q '^OK' "$S/verificar_expedientes.txt" || falla "$1: expedientes"
+  grep -q '^OK' "$S/verificar_sellos.txt" || falla "$1: sellos de tiempo RFC 3161"
+  grep -q '"motivo": "ancla_auditoria"' "$S/entrega/sellos/indice.jsonl" || echo "AVISO $1: sin ancla externa de la auditoría (¿sin internet?)" | tee -a "$R"
   grep -q '^OK' "$S/sha256sum.txt" || falla "$1: hashes de capturas"
   grep -q 'fuera de RFC 5737: 0' "$S/datos_ficticios.txt" || falla "$1: IPs no ficticias"
   grep -q 'fuera de .test/.example: 0' "$S/datos_ficticios.txt" || falla "$1: dominios no ficticios"

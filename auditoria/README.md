@@ -42,7 +42,7 @@ Estados: **cumple** (hay código y una comprobación automática que lo confirma
 | N2 | …y no es un licenciatario en su propio dominio | `verificar_marca()` (`host_en` contra `dominios` del licenciatario) | `verificar.py`: «bloqueos falsos positivos: 0» | cumple |
 | N3 | Servidor que entrega el video: host, IP y ASN | `Armador` en `expedientes.py` (datos de la detección del simulador) | cada `entrega/expedientes/EXP-*.json` | cumple |
 | N4 | Riesgo colateral: IP compartida → bloqueo por dominio | `evaluar_colateral()` (DNS pasivo del simulador) | `verificar.py`: «bloqueos con daño colateral: 0», «dominios legítimos afectados: 0» | cumple |
-| N5 | Hashes de la captura y sellos de tiempo | `sellar()`, `exportar_capturas()` → `evidencia/SHA256SUMS` | `sha256sum -c SHA256SUMS` (paso 6 de `correr.sh`) | parcial: el sello es la hora del motor encadenada por hash, no un sello RFC 3161 de un tercero (la app web sí usa RFC 3161) |
+| N5 | Hashes de la captura y sellos de tiempo | `sellar()`, `exportar_capturas()` → `evidencia/SHA256SUMS` | `sha256sum -c SHA256SUMS`; `servidor.py --verificar-sellos <salida>/sellos` (cada `hash_encadenado` y cada decisión tienen un `.tsr` de FreeTSA/Sectigo, `sello_tiempo.py`) | cumple (sin internet, el sello queda `sello_fallido` en la auditoría y el circuito sigue) |
 | N6 | Notificación al juez de turno | `Plataforma.abrir_tramite()` → evento `juez_notificado` | `auditoria.jsonl` | cumple |
 | N7 | Decisión firmada | `decidir_expediente()`: firma HMAC sobre el hash del expediente | `--verificar-auditoria` | parcial: la clave HMAC del juez la guarda el servidor, así que la firma no prueba por sí sola que la puso el juez (la app web usa Ed25519 con la clave en el dispositivo del juez) |
 | N8 | Juez entra con usuario y contraseña | `Plataforma.login()` (PBKDF2), `usuarios_demo.json`; en la app web, Supabase Auth | `juez_automatico.py` hace login | cumple |
@@ -52,7 +52,7 @@ Estados: **cumple** (hay código y una comprobación automática que lo confirma
 | N12 | Reintento si falla | `enviar()` → `reintentar()` con `orden_id` nuevo y firmas de reserva | `verificar.py`: órdenes fallidas > 0 y fases bloqueadas 7/7 | cumple |
 | N13 | Seguimiento de la confirmación | `seguir_ordenes()` → `confirmacion_aplicada` | `auditoria.jsonl` | cumple |
 | N14 | Vencimiento automático de bloqueos por IP al terminar | `vence_min` en la orden; `controlar_vencimiento()` | `verificar.py`: «bloqueos ip activos post partido: 0» | cumple |
-| N15 | Registro de auditoría de cada paso | clase `Auditoria` (JSONL encadenado SHA-256) | `--verificar-auditoria` | parcial: la cadena detecta cambios en el medio, pero no un archivo reescrito entero. Falta anclar la cabecera afuera (sello RFC 3161 o publicarla en el registro público) |
+| N15 | Registro de auditoría de cada paso | clase `Auditoria` (JSONL encadenado SHA-256) | `--verificar-auditoria`; `--verificar-sellos` comprueba que cada ancla RFC 3161 coincide con la entrada `n` | cumple: la cabecera se sella con RFC 3161 cada 25 entradas y al final del partido, y se muestra en `/publico`. Reescribir el archivo deja de coincidir con las anclas selladas por un tercero |
 
 ## Matriz de extras
 
