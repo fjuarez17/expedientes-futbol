@@ -222,7 +222,7 @@ function score(c) {
 }
 
 /* ===== Router ===== */
-const routes = { panel: vPanel, partidos: vPartidos, expedientes: vExpedientes, exp: vExp, nuevo: vNuevo, conocimiento: vConocimiento, licencias: vLicencias, verificar: vVerificar, auditoria: vAuditoria };
+const routes = { panel: vPanel, partidos: vPartidos, expedientes: vExpedientes, exp: vExp, nuevo: vNuevo, conocimiento: vConocimiento, licencias: vLicencias, pruebas: vPruebas, verificar: vVerificar, auditoria: vAuditoria };
 async function route() {
   const [path, qs] = (location.hash.slice(2) || 'panel').split('?');
   const [name, arg] = path.split('/');
@@ -578,6 +578,43 @@ window.genMarks = async () => {
   const mid = $('#gM').value, lic = $('#gL').value, n = Math.min(50, +$('#gN').value || 1);
   for (let i = 0; i < n; i++) { const s = [...crypto.getRandomValues(new Uint8Array(4))].map(b => b.toString(16).padStart(2, '0')).join(''); DB.marks.push({ payload: await makePayload(mid, lic, s), session: s.toUpperCase(), note: 'prueba', matchId: mid }); }
   save(); await audit('marcas_generadas', null, `${n} ${lic} ${mid}`); route();
+};
+
+/* --- Banco de pruebas de marcas (servidor de prueba: /api/mock-payloads + /api/verify-mark) --- */
+const HTTP_TXT = { 200: '200 OK', 400: '400 Bad Request', 403: '403 Forbidden', 422: '422 Unprocessable Entity' };
+const httpPill = (s) => `<span class="pill ${s === 200 ? 'ok' : s === 403 ? 'bad' : 'warn'}">${esc(HTTP_TXT[s] || String(s))}</span>`;
+let MOCK = null;
+async function vPruebas() {
+  return `${hero('Banco de pruebas', 'de marcas de agua contra un servidor de prueba.')}
+  <div class="card"><h2>Servidor de pruebas</h2><p class="small mut">Valida payloads contra una base de prueba ficticia, sin señales reales de ningún licenciatario. Responde <b>200</b> si el payload es válido y figura como emitido, <b>403</b> si la señal no está autorizada (licenciatario, partido o sesión fuera de la base), <b>422</b> si el dígito de control no coincide y <b>400</b> si el formato es inválido.</p>
+  <div class="row"><input id="tbIn" class="mono" placeholder="AR-XXXXXX-LIC-XXXXXXXX-XXXX" style="flex:1"><select id="tbM"><option value="">cualquier partido</option>${(MOCK ? MOCK.base.matches : []).map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('')}</select><button onclick="tbVerify()">Verificar</button></div><div id="tbOut"></div></div>
+  <div class="card"><h2>Payloads simulados</h2><p class="small mut">El emisor mock genera payloads con la estructura del detector forense (payload, partido y metadatos del detector) y el código que el servidor debería devolver.</p>
+  <div class="row"><button class="ghost" onclick="tbMock()">Generar payloads simulados</button>${MOCK ? '<button onclick="tbRunAll()">Verificar todos</button>' : ''}</div><div id="tbSum"></div>
+  ${MOCK ? `<div class="tbl"><table><tr><th>Tipo</th><th>Payload</th><th>Esperado</th><th>Obtenido</th><th></th></tr>${MOCK.payloads.map((p, i) => `<tr><td>${esc(p.kind)}</td><td class="mono small">${esc(p.payload)}<div class="mut">${esc(p.matchId)} · confianza ${p.detector.confidence}</div></td><td>${httpPill(p.expected)}</td><td id="tbG${i}">${p.got ? httpPill(p.got) : '—'}</td><td id="tbR${i}">${p.got ? (p.got === p.expected ? '<i class="ck y"></i>' : '<i class="ck n"></i>') : ''}</td></tr>`).join('')}</table></div>` : ''}</div>
+  ${MOCK ? `<div class="card"><h2>Base de prueba: marcas emitidas</h2><div class="tbl"><table><tr><th>Payload</th><th>Partido</th><th>Sesión</th></tr>${MOCK.base.marks.map(k => `<tr><td class="mono small">${esc(k.payload)}</td><td>${esc(k.matchId)}</td><td>${esc(k.session)} · ${esc(k.note)}</td></tr>`).join('')}</table></div></div>` : ''}`;
+}
+async function verifyMarkApi(payload, matchId) {
+  const r = await fetch('/api/verify-mark', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload, matchId: matchId || undefined }) });
+  return { status: r.status, j: await r.json().catch(() => ({})) };
+}
+window.tbVerify = async () => {
+  const out = $('#tbOut'); out.innerHTML = '<p><span class="spin"></span> Consultando el servidor de pruebas…</p>';
+  try {
+    const { status, j } = await verifyMarkApi($('#tbIn').value, $('#tbM').value);
+    out.innerHTML = `<p>${httpPill(status)} <span class="small mut">${esc(j.code || j.error || '')}</span></p><ul class="check small">${(j.checks || []).map(x => `<li><i class="ck ${x.ok ? 'y' : 'n'}"></i> ${esc(x.t)}</li>`).join('')}</ul>`;
+  } catch { out.innerHTML = '<div class="verdict bad">Sin conexión con el servidor de pruebas</div>'; }
+};
+window.tbMock = async () => {
+  try { const r = await fetch('/api/mock-payloads?n=14'); if (!r.ok) throw 0; MOCK = await r.json(); route(); } catch { toast('No respondió /api/mock-payloads'); }
+};
+window.tbRunAll = async () => {
+  let ok = 0;
+  for (const [i, p] of MOCK.payloads.entries()) {
+    try { p.got = (await verifyMarkApi(p.payload, p.matchId)).status; } catch { p.got = 0; }
+    if (p.got === p.expected) ok++;
+    $('#tbG' + i).innerHTML = httpPill(p.got); $('#tbR' + i).innerHTML = `<i class="ck ${p.got === p.expected ? 'y' : 'n'}"></i>`;
+  }
+  $('#tbSum').innerHTML = `<div class="verdict ${ok === MOCK.payloads.length ? 'ok' : 'bad'}">${ok}/${MOCK.payloads.length} respuestas con el código esperado</div>`;
 };
 
 /* --- Verificar --- */

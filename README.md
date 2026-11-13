@@ -128,6 +128,7 @@ Reglas, editables a mano:
   - subir un archivo → calcula su hash y dice si coincide con alguna captura registrada;
   - subir un expediente JSON → recalcula el hash y dice si fue alterado respecto del sellado;
   - verificar todos los expedientes del dispositivo.
+- **Banco de pruebas** (`#/pruebas`): servidor de pruebas de marcas de agua con una base ficticia, sin tocar señales reales. `GET /api/mock-payloads` emite payloads simulados con la estructura del detector forense (válidos, adulterados, no emitidos, licenciatario desconocido, otro partido, malformados) y `POST /api/verify-mark` (`{"payload": "...", "matchId": "..."}`) responde **200** si es válido y figura como emitido, **403** si la señal no está autorizada, **422** si el dígito de control no coincide y **400** si el formato es inválido. La pantalla permite verificar un payload a mano o correr el lote completo y comparar el código obtenido con el esperado. `node api/_wm.js 20` imprime payloads simulados por consola.
 - **Auditoría**: cada acción (crear, analizar, verificar marca, agregar captura, sellar, editar vencimiento, borrar…) queda en un **registro encadenado por hash** (cada evento incluye el hash del anterior). Si alguien modifica o borra un evento, la cadena se rompe y se ve en qué evento.
 
 ---
@@ -257,7 +258,11 @@ Cosas necesarias para usarla en producción y que **no están hechas**:
 │   ├── _lib.js         # Utilidades: fetch con timeout, DNS, RIPEstat, reverse IP, RDAP, clasificación de ASN/CDN
 │   ├── analyze.js      # Análisis técnico: cadena de carga, servidor de video, riesgo colateral
 │   ├── timestamp.js    # Sellado RFC 3161 (FreeTSA + respaldos)
+│   ├── _wm.js          # Marca de agua: regex, dígito de control, base de prueba y emisor mock
+│   ├── verify-mark.js  # Servidor de pruebas de marcas (200 / 403 / 422 / 400)
+│   ├── mock-payloads.js # Payloads simulados del detector forense
 │   └── fixtures.js     # Fixture de la Liga Profesional (TheSportsDB)
+├── tests/wm.test.js    # Pruebas unitarias y de API (node --test tests/)
 └── vercel.json         # Config de Vercel (timeout de funciones y cabeceras)
 ```
 
@@ -271,6 +276,9 @@ No tiene dependencias ni paso de build.
 # Local (requiere Node 20 y Vercel CLI)
 npm i -g vercel
 vercel dev            # http://localhost:3000
+
+# Pruebas (Node 20, sin dependencias)
+node --test tests/
 
 # Publicar
 vercel deploy --prod
