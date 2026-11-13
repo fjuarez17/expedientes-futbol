@@ -1,0 +1,12 @@
+laura login: (401, {'error': 'Usuario o contraseña incorrectos'})
+login con clave incorrecta: 401
+laura login: (200, {'ok': True})
+martin login: (200, {'ok': True})
+[min 2.03] laura expediente EXP-2026-000001: (200, {'ok': True, 'decision': 'aprobado'})
+[min 6.12] laura expediente EXP-2026-000002: (200, {'ok': True, 'decision': 'aprobado'})
+[min 9.2] laura expediente EXP-2026-000003: (200, {'ok': True, 'decision': 'aprobado'})
+[min 37.65] laura expediente EXP-2026-000004: (200, {'ok': True, 'decision': 'aprobado'})
+laura fuera de turno intenta firmar: (403, {'error': 'El juez no está de turno: no puede firmar.'})
+[min 55.12] martin expediente EXP-2026-000005: (200, {'ok': True, 'decision': 'aprobado'})
+[min 71.14] martin expediente EXP-2026-000006: (200, {'ok': True, 'decision': 'aprobado'})
+[min 82.11] martin expediente EXP-2026-000007: (200, {'ok': True, 'decision': 'aprobado'})

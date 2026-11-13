@@ -70,7 +70,7 @@ Suma como diferencial, pero **no reemplaza al núcleo**: la consigna dice que lo
 
 ## Última corrida
 
-`corridas/20261113T025420Z-784fa30/` (commit `784fa30` = `main` con el PR #1 incorporado + esta carpeta, aceleración x30). La corrida anterior (`20261113T023339Z-05d3e17`, solo el partido normal) queda como histórico.
+`corridas/20261113T031423Z-401466a/` (commit `401466a`: motor con sellos RFC 3161, sin cambios sin commitear, aceleración x30). Las corridas anteriores (`20261113T023339Z-05d3e17`, solo el partido normal, y `20261113T025420Z-784fa30`, tres partidos sin sellos externos) quedan como histórico.
 
 | Control | oficial | cambio_turno | reclamo |
 |---|---|---|---|
@@ -81,10 +81,13 @@ Suma como diferencial, pero **no reemplaza al núcleo**: la consigna dice que lo
 | Bloqueos por IP activos después del partido | 0 | | |
 | Órdenes firmadas fuera de turno | 0 | 0 (1 intento rechazado con 403) | |
 | Pendientes reasignados al entrante / firmados por el entrante / por la saliente | | 4 / 7 / 0 | |
-| Reclamo | | | R-001 `noticias-del-valle.test` levantado en 0,5 min |
-| Auditoría encadenada | 188 íntegras | 196 íntegras | 197 íntegras |
+| Reclamo | | | R-001 `noticias-del-valle.test` levantado en 0,2 min |
+| Auditoría encadenada | 243 íntegras | 252 íntegras | 253 íntegras |
+| Sellos RFC 3161 (`--verificar-sellos`) · anclas de la auditoría | 55 OK · 10 | 56 OK · 11 | 56 OK · 11 |
 | Expedientes y capturas | 7 y 38 OK | 7 y 38 OK | 7 y 38 OK |
 | Datos ficticios | 0 IPs / 0 dominios fuera de rango | ídem | ídem |
 | Veredicto | **NÚCLEO OK · CAMBIO DE TURNO OK · RECLAMO OK** | | |
+
+La última ancla del partido oficial se verificó además con la cadena de certificados de FreeTSA (`openssl ts -verify … -CAfile cacert.pem -untrusted tsa.crt` → `Verification: OK`), y su hash coincide con la entrada 241 de `auditoria.jsonl`.
 
 **Nota sobre el cambio de turno.** Con la jueza saliente ausente, `pelotaya` fase 1 (min 2–36) no se bloquea nunca y los streams que arrancan antes del minuto 50 recién se bloquean al entrar el juez (42 a 45 min tarde). La plataforma hace lo correcto (nadie firma por la jueza), pero en la final **cada minuto sin un juez atento cuesta puntos de Velocidad**. Ver `PRIORIDADES.md`.

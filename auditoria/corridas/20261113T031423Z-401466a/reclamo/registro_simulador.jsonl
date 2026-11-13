@@ -1,0 +1,105 @@
+{"min": 0.0, "evento": "simulacion_iniciada", "escenario": "practica-01", "acelerar": 30.0, "fin_min": 105.0}
+{"min": 2.197, "evento": "orden_recibida", "proveedor": "aurora", "juez_de_turno": true, "orden_id": "ORD-00001", "expediente_id": "EXP-2026-000001", "tipo": "ip", "objetivo": "203.0.113.10", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 2.198, "evento": "orden_recibida", "proveedor": "andina", "juez_de_turno": true, "orden_id": "ORD-00005", "expediente_id": "EXP-2026-000001", "tipo": "ip", "objetivo": "203.0.113.10", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 2.199, "evento": "orden_recibida", "proveedor": "valle", "juez_de_turno": true, "orden_id": "ORD-00009", "expediente_id": "EXP-2026-000001", "tipo": "dominio", "objetivo": "s1-respaldo.pelotaya.test", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 2.199, "evento": "orden_recibida", "proveedor": "valle", "juez_de_turno": true, "orden_id": "ORD-00013", "expediente_id": "EXP-2026-000001", "tipo": "dominio", "objetivo": "s1.pelotaya.test", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 2.2, "evento": "orden_recibida", "proveedor": "cumbre", "juez_de_turno": true, "orden_id": "ORD-00017", "expediente_id": "EXP-2026-000001", "tipo": "ip", "objetivo": "203.0.113.10", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 2.773, "evento": "orden_aplicada", "proveedor": "aurora", "orden_id": "ORD-00001", "tipo": "ip", "objetivo": "203.0.113.10"}
+{"min": 4.337, "evento": "orden_aplicada", "proveedor": "cumbre", "orden_id": "ORD-00017", "tipo": "ip", "objetivo": "203.0.113.10"}
+{"min": 4.441, "evento": "orden_aplicada", "proveedor": "andina", "orden_id": "ORD-00005", "tipo": "ip", "objetivo": "203.0.113.10"}
+{"min": 6.344, "evento": "orden_recibida", "proveedor": "aurora", "juez_de_turno": true, "orden_id": "ORD-00021", "expediente_id": "EXP-2026-000002", "tipo": "ip", "objetivo": "198.51.100.20", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 6.344, "evento": "orden_recibida", "proveedor": "andina", "juez_de_turno": true, "orden_id": "ORD-00025", "expediente_id": "EXP-2026-000002", "tipo": "ip", "objetivo": "198.51.100.20", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 6.345, "evento": "orden_recibida", "proveedor": "valle", "juez_de_turno": true, "orden_id": "ORD-00029", "expediente_id": "EXP-2026-000002", "tipo": "dominio", "objetivo": "live.golazo-libre.test", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 6.345, "evento": "orden_recibida", "proveedor": "cumbre", "juez_de_turno": true, "orden_id": "ORD-00033", "expediente_id": "EXP-2026-000002", "tipo": "ip", "objetivo": "198.51.100.20", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 6.912, "evento": "orden_aplicada", "proveedor": "aurora", "orden_id": "ORD-00021", "tipo": "ip", "objetivo": "198.51.100.20"}
+{"min": 8.261, "evento": "orden_aplicada", "proveedor": "andina", "orden_id": "ORD-00025", "tipo": "ip", "objetivo": "198.51.100.20"}
+{"min": 8.379, "evento": "orden_aplicada", "proveedor": "valle", "orden_id": "ORD-00013", "tipo": "dominio", "objetivo": "s1.pelotaya.test"}
+{"min": 8.611, "evento": "orden_aplicada", "proveedor": "cumbre", "orden_id": "ORD-00033", "tipo": "ip", "objetivo": "198.51.100.20"}
+{"min": 9.31, "evento": "orden_aplicada", "proveedor": "valle", "orden_id": "ORD-00009", "tipo": "dominio", "objetivo": "s1-respaldo.pelotaya.test"}
+{"min": 9.477, "evento": "orden_recibida", "proveedor": "aurora", "juez_de_turno": true, "orden_id": "ORD-00037", "expediente_id": "EXP-2026-000003", "tipo": "dominio", "objetivo": "tv.verpartido-hd.test", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 9.477, "evento": "orden_recibida", "proveedor": "andina", "juez_de_turno": true, "orden_id": "ORD-00041", "expediente_id": "EXP-2026-000003", "tipo": "dominio", "objetivo": "tv.verpartido-hd.test", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 9.478, "evento": "orden_recibida", "proveedor": "valle", "juez_de_turno": true, "orden_id": "ORD-00045", "expediente_id": "EXP-2026-000003", "tipo": "dominio", "objetivo": "tv.verpartido-hd.test", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 9.478, "evento": "orden_recibida", "proveedor": "cumbre", "juez_de_turno": true, "orden_id": "ORD-00049", "expediente_id": "EXP-2026-000003", "tipo": "dominio", "objetivo": "tv.verpartido-hd.test", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 9.912, "evento": "reclamo_emitido", "orden_id": "ORD-00021", "id": "R-001", "dominio": "noticias-del-valle.test", "proveedor": "aurora", "mensaje": "Noticias del Valle: el diario no carga para lectores de varios proveedores."}
+{"min": 10.012, "evento": "orden_aplicada", "proveedor": "aurora", "orden_id": "ORD-00037", "tipo": "dominio", "objetivo": "tv.verpartido-hd.test"}
+{"min": 10.085, "evento": "orden_levantada", "proveedor": "aurora", "orden_id": "ORD-00021", "juez_id": "jueza-laura-ficticia", "motivo": "Reclamo R-001"}
+{"min": 10.086, "evento": "orden_recibida", "proveedor": "aurora", "juez_de_turno": true, "orden_id": "ORD-00053", "expediente_id": "EXP-2026-000002", "tipo": "dominio", "objetivo": "live.golazo-libre.test", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 10.086, "evento": "orden_levantada", "proveedor": "andina", "orden_id": "ORD-00025", "juez_id": "jueza-laura-ficticia", "motivo": "Reclamo R-001"}
+{"min": 10.087, "evento": "orden_recibida", "proveedor": "andina", "juez_de_turno": true, "orden_id": "ORD-00054", "expediente_id": "EXP-2026-000002", "tipo": "dominio", "objetivo": "live.golazo-libre.test", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 10.087, "evento": "orden_levantada", "proveedor": "cumbre", "orden_id": "ORD-00033", "juez_id": "jueza-laura-ficticia", "motivo": "Reclamo R-001"}
+{"min": 10.088, "evento": "orden_recibida", "proveedor": "cumbre", "juez_de_turno": true, "orden_id": "ORD-00055", "expediente_id": "EXP-2026-000002", "tipo": "dominio", "objetivo": "live.golazo-libre.test", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 10.609, "evento": "orden_aplicada", "proveedor": "aurora", "orden_id": "ORD-00053", "tipo": "dominio", "objetivo": "live.golazo-libre.test"}
+{"min": 11.693, "evento": "orden_aplicada", "proveedor": "andina", "orden_id": "ORD-00041", "tipo": "dominio", "objetivo": "tv.verpartido-hd.test"}
+{"min": 11.759, "evento": "orden_aplicada", "proveedor": "valle", "orden_id": "ORD-00029", "tipo": "dominio", "objetivo": "live.golazo-libre.test"}
+{"min": 12.208, "evento": "orden_aplicada", "proveedor": "andina", "orden_id": "ORD-00054", "tipo": "dominio", "objetivo": "live.golazo-libre.test"}
+{"min": 12.494, "evento": "orden_aplicada", "proveedor": "cumbre", "orden_id": "ORD-00049", "tipo": "dominio", "objetivo": "tv.verpartido-hd.test"}
+{"min": 13.076, "evento": "orden_fallida", "proveedor": "cumbre", "orden_id": "ORD-00055", "motivo": "Error interno del proveedor. Reenviar la orden con un nuevo orden_id."}
+{"min": 13.471, "evento": "orden_recibida", "proveedor": "cumbre", "juez_de_turno": true, "orden_id": "ORD-00056", "expediente_id": "EXP-2026-000002", "tipo": "dominio", "objetivo": "live.golazo-libre.test", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 15.915, "evento": "orden_aplicada", "proveedor": "cumbre", "orden_id": "ORD-00056", "tipo": "dominio", "objetivo": "live.golazo-libre.test"}
+{"min": 15.958, "evento": "orden_aplicada", "proveedor": "valle", "orden_id": "ORD-00045", "tipo": "dominio", "objetivo": "tv.verpartido-hd.test"}
+{"min": 37.81, "evento": "orden_recibida", "proveedor": "aurora", "juez_de_turno": true, "orden_id": "ORD-00057", "expediente_id": "EXP-2026-000004", "tipo": "ip", "objetivo": "203.0.113.11", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 37.811, "evento": "orden_recibida", "proveedor": "andina", "juez_de_turno": true, "orden_id": "ORD-00061", "expediente_id": "EXP-2026-000004", "tipo": "ip", "objetivo": "203.0.113.11", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 37.811, "evento": "orden_recibida", "proveedor": "valle", "juez_de_turno": true, "orden_id": "ORD-00065", "expediente_id": "EXP-2026-000004", "tipo": "dominio", "objetivo": "s2.pelotaya.test", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 37.812, "evento": "orden_recibida", "proveedor": "cumbre", "juez_de_turno": true, "orden_id": "ORD-00069", "expediente_id": "EXP-2026-000004", "tipo": "ip", "objetivo": "203.0.113.11", "vence_min": 105, "juzgado_id": "jg-centro-3", "juez_id": "jueza-laura-ficticia"}
+{"min": 38.198, "evento": "orden_aplicada", "proveedor": "aurora", "orden_id": "ORD-00057", "tipo": "ip", "objetivo": "203.0.113.11"}
+{"min": 39.525, "evento": "orden_aplicada", "proveedor": "andina", "orden_id": "ORD-00061", "tipo": "ip", "objetivo": "203.0.113.11"}
+{"min": 40.169, "evento": "orden_aplicada", "proveedor": "cumbre", "orden_id": "ORD-00069", "tipo": "ip", "objetivo": "203.0.113.11"}
+{"min": 42.098, "evento": "orden_aplicada", "proveedor": "valle", "orden_id": "ORD-00065", "tipo": "dominio", "objetivo": "s2.pelotaya.test"}
+{"min": 55.355, "evento": "orden_recibida", "proveedor": "aurora", "juez_de_turno": true, "orden_id": "ORD-00073", "expediente_id": "EXP-2026-000005", "tipo": "ip", "objetivo": "203.0.113.40", "vence_min": 105, "juzgado_id": "jg-norte-1", "juez_id": "juez-martin-ejemplo"}
+{"min": 55.356, "evento": "orden_recibida", "proveedor": "andina", "juez_de_turno": true, "orden_id": "ORD-00077", "expediente_id": "EXP-2026-000005", "tipo": "ip", "objetivo": "203.0.113.40", "vence_min": 105, "juzgado_id": "jg-norte-1", "juez_id": "juez-martin-ejemplo"}
+{"min": 55.357, "evento": "orden_recibida", "proveedor": "valle", "juez_de_turno": true, "orden_id": "ORD-00081", "expediente_id": "EXP-2026-000005", "tipo": "dominio", "objetivo": "x9.tribuna-pirata.test", "vence_min": 105, "juzgado_id": "jg-norte-1", "juez_id": "juez-martin-ejemplo"}
+{"min": 55.357, "evento": "orden_recibida", "proveedor": "cumbre", "juez_de_turno": true, "orden_id": "ORD-00085", "expediente_id": "EXP-2026-000005", "tipo": "ip", "objetivo": "203.0.113.40", "vence_min": 105, "juzgado_id": "jg-norte-1", "juez_id": "juez-martin-ejemplo"}
+{"min": 55.745, "evento": "orden_aplicada", "proveedor": "aurora", "orden_id": "ORD-00073", "tipo": "ip", "objetivo": "203.0.113.40"}
+{"min": 57.563, "evento": "orden_aplicada", "proveedor": "andina", "orden_id": "ORD-00077", "tipo": "ip", "objetivo": "203.0.113.40"}
+{"min": 57.594, "evento": "orden_aplicada", "proveedor": "cumbre", "orden_id": "ORD-00085", "tipo": "ip", "objetivo": "203.0.113.40"}
+{"min": 61.847, "evento": "orden_aplicada", "proveedor": "valle", "orden_id": "ORD-00081", "tipo": "dominio", "objetivo": "x9.tribuna-pirata.test"}
+{"min": 71.369, "evento": "orden_recibida", "proveedor": "aurora", "juez_de_turno": true, "orden_id": "ORD-00089", "expediente_id": "EXP-2026-000006", "tipo": "ip", "objetivo": "198.51.100.77", "vence_min": 105, "juzgado_id": "jg-norte-1", "juez_id": "juez-martin-ejemplo"}
+{"min": 71.37, "evento": "orden_recibida", "proveedor": "andina", "juez_de_turno": true, "orden_id": "ORD-00093", "expediente_id": "EXP-2026-000006", "tipo": "ip", "objetivo": "198.51.100.77", "vence_min": 105, "juzgado_id": "jg-norte-1", "juez_id": "juez-martin-ejemplo"}
+{"min": 71.37, "evento": "orden_recibida", "proveedor": "valle", "juez_de_turno": true, "orden_id": "ORD-00097", "expediente_id": "EXP-2026-000006", "tipo": "dominio", "objetivo": "espejo.pelotaya.test", "vence_min": 105, "juzgado_id": "jg-norte-1", "juez_id": "juez-martin-ejemplo"}
+{"min": 71.371, "evento": "orden_recibida", "proveedor": "valle", "juez_de_turno": true, "orden_id": "ORD-00101", "expediente_id": "EXP-2026-000006", "tipo": "dominio", "objetivo": "s3.pelotaya.test", "vence_min": 105, "juzgado_id": "jg-norte-1", "juez_id": "juez-martin-ejemplo"}
+{"min": 71.371, "evento": "orden_recibida", "proveedor": "cumbre", "juez_de_turno": true, "orden_id": "ORD-00105", "expediente_id": "EXP-2026-000006", "tipo": "ip", "objetivo": "198.51.100.77", "vence_min": 105, "juzgado_id": "jg-norte-1", "juez_id": "juez-martin-ejemplo"}
+{"min": 71.98, "evento": "orden_aplicada", "proveedor": "aurora", "orden_id": "ORD-00089", "tipo": "ip", "objetivo": "198.51.100.77"}
+{"min": 72.934, "evento": "orden_aplicada", "proveedor": "andina", "orden_id": "ORD-00093", "tipo": "ip", "objetivo": "198.51.100.77"}
+{"min": 73.689, "evento": "orden_aplicada", "proveedor": "cumbre", "orden_id": "ORD-00105", "tipo": "ip", "objetivo": "198.51.100.77"}
+{"min": 77.64, "evento": "orden_aplicada", "proveedor": "valle", "orden_id": "ORD-00097", "tipo": "dominio", "objetivo": "espejo.pelotaya.test"}
+{"min": 77.596, "evento": "orden_aplicada", "proveedor": "valle", "orden_id": "ORD-00101", "tipo": "dominio", "objetivo": "s3.pelotaya.test"}
+{"min": 82.357, "evento": "orden_recibida", "proveedor": "aurora", "juez_de_turno": true, "orden_id": "ORD-00109", "expediente_id": "EXP-2026-000007", "tipo": "ip", "objetivo": "203.0.113.41", "vence_min": 105, "juzgado_id": "jg-norte-1", "juez_id": "juez-martin-ejemplo"}
+{"min": 82.358, "evento": "orden_recibida", "proveedor": "andina", "juez_de_turno": true, "orden_id": "ORD-00113", "expediente_id": "EXP-2026-000007", "tipo": "ip", "objetivo": "203.0.113.41", "vence_min": 105, "juzgado_id": "jg-norte-1", "juez_id": "juez-martin-ejemplo"}
+{"min": 82.359, "evento": "orden_recibida", "proveedor": "valle", "juez_de_turno": true, "orden_id": "ORD-00117", "expediente_id": "EXP-2026-000007", "tipo": "dominio", "objetivo": "x10.tribuna-pirata.test", "vence_min": 105, "juzgado_id": "jg-norte-1", "juez_id": "juez-martin-ejemplo"}
+{"min": 82.359, "evento": "orden_recibida", "proveedor": "cumbre", "juez_de_turno": true, "orden_id": "ORD-00121", "expediente_id": "EXP-2026-000007", "tipo": "ip", "objetivo": "203.0.113.41", "vence_min": 105, "juzgado_id": "jg-norte-1", "juez_id": "juez-martin-ejemplo"}
+{"min": 82.993, "evento": "orden_aplicada", "proveedor": "aurora", "orden_id": "ORD-00109", "tipo": "ip", "objetivo": "203.0.113.41"}
+{"min": 84.614, "evento": "orden_aplicada", "proveedor": "andina", "orden_id": "ORD-00113", "tipo": "ip", "objetivo": "203.0.113.41"}
+{"min": 85.15, "evento": "orden_aplicada", "proveedor": "cumbre", "orden_id": "ORD-00121", "tipo": "ip", "objetivo": "203.0.113.41"}
+{"min": 86.818, "evento": "orden_aplicada", "proveedor": "valle", "orden_id": "ORD-00117", "tipo": "dominio", "objetivo": "x10.tribuna-pirata.test"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "aurora", "orden_id": "ORD-00001"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "aurora", "orden_id": "ORD-00037"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "aurora", "orden_id": "ORD-00053"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "aurora", "orden_id": "ORD-00057"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "aurora", "orden_id": "ORD-00073"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "aurora", "orden_id": "ORD-00089"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "aurora", "orden_id": "ORD-00109"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "andina", "orden_id": "ORD-00005"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "andina", "orden_id": "ORD-00041"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "andina", "orden_id": "ORD-00054"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "andina", "orden_id": "ORD-00061"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "andina", "orden_id": "ORD-00077"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "andina", "orden_id": "ORD-00093"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "andina", "orden_id": "ORD-00113"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "valle", "orden_id": "ORD-00009"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "valle", "orden_id": "ORD-00013"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "valle", "orden_id": "ORD-00029"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "valle", "orden_id": "ORD-00045"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "valle", "orden_id": "ORD-00065"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "valle", "orden_id": "ORD-00081"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "valle", "orden_id": "ORD-00097"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "valle", "orden_id": "ORD-00101"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "valle", "orden_id": "ORD-00117"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "cumbre", "orden_id": "ORD-00017"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "cumbre", "orden_id": "ORD-00049"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "cumbre", "orden_id": "ORD-00056"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "cumbre", "orden_id": "ORD-00069"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "cumbre", "orden_id": "ORD-00085"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "cumbre", "orden_id": "ORD-00105"}
+{"min": 105.0, "evento": "orden_vencida", "proveedor": "cumbre", "orden_id": "ORD-00121"}
+{"min": 105.0, "evento": "partido_finalizado"}
+{"min": 110.0, "evento": "ventana_cerrada", "ordenes_activas": []}

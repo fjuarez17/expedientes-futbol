@@ -1,0 +1,4 @@
+Para: Telegram
+Objetivo: https://t.example/tribunapirata
+
+Por orden judicial (Dr. Martín Ejemplo — Juzgado de Garantías N.º 1 (ficticio) — Distrito Judicial Norte. Orden EXP-2026-000007, firma 474c1de7e264b4db…) se solicita a Telegram retirar la publicación https://t.example/tribunapirata (minuto 54), que promociona la transmisión no autorizada https://tribuna-pirata.test/ver, y preservar los datos de la cuenta que la publicó. Evidencia: expediente EXP-2026-000007, hash 92011a7490b731089ca9f8716203bb2245bf3557568fe1f2c92899c5f3cd83c2.

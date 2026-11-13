@@ -1,0 +1,85 @@
+TAP version 13
+# Subtest: captura: rechaza hosts privados o locales
+ok 1 - captura: rechaza hosts privados o locales
+  ---
+  duration_ms: 151.442423
+  ...
+# Subtest: captura: rechaza URL inválida
+ok 2 - captura: rechaza URL inválida
+  ---
+  duration_ms: 0.262707
+  ...
+# Subtest: hls: variantes ordenadas y se elige la más liviana con video
+ok 3 - hls: variantes ordenadas y se elige la más liviana con video
+  ---
+  duration_ms: 1.6026
+  ...
+# Subtest: hls: lista en vivo, cerrada, cifrada y fMP4
+ok 4 - hls: lista en vivo, cerrada, cifrada y fMP4
+  ---
+  duration_ms: 0.964946
+  ...
+# Subtest: fútbol: la página de prueba da señales de streaming de fútbol
+ok 5 - fútbol: la página de prueba da señales de streaming de fútbol
+  ---
+  duration_ms: 2.27228
+  ...
+# Subtest: fútbol: una página cualquiera no da señales
+ok 6 - fútbol: una página cualquiera no da señales
+  ---
+  duration_ms: 0.141709
+  ...
+# Subtest: captura de stream: rechaza hosts privados y URL inválida
+ok 7 - captura de stream: rechaza hosts privados y URL inválida
+  ---
+  duration_ms: 111.140028
+  ...
+# Subtest: el regex acepta el formato exacto y normaliza mayúsculas y espacios
+ok 8 - el regex acepta el formato exacto y normaliza mayúsculas y espacios
+  ---
+  duration_ms: 1.730432
+  ...
+# Subtest: el regex rechaza variantes de formato
+ok 9 - el regex rechaza variantes de formato
+  ---
+  duration_ms: 0.180965
+  ...
+# Subtest: el dígito de control es el SHA-256 del resto, igual que en app.js
+ok 10 - el dígito de control es el SHA-256 del resto, igual que en app.js
+  ---
+  duration_ms: 0.191269
+  ...
+# Subtest: cambiar cualquier carácter hex del payload rompe el control (422)
+ok 11 - cambiar cualquier carácter hex del payload rompe el control (422)
+  ---
+  duration_ms: 0.481719
+  ...
+# Subtest: verifyPayload: 200 emitido, 403 no autorizado, 422 control, 400 formato
+ok 12 - verifyPayload: 200 emitido, 403 no autorizado, 422 control, 400 formato
+  ---
+  duration_ms: 0.325092
+  ...
+# Subtest: cada tipo de payload simulado obtiene el código esperado
+ok 13 - cada tipo de payload simulado obtiene el código esperado
+  ---
+  duration_ms: 5.5928
+  ...
+# Subtest: POST /api/verify-mark responde con el código HTTP de cada caso
+ok 14 - POST /api/verify-mark responde con el código HTTP de cada caso
+  ---
+  duration_ms: 3.454403
+  ...
+# Subtest: GET /api/mock-payloads emite payloads con la estructura del detector
+ok 15 - GET /api/mock-payloads emite payloads con la estructura del detector
+  ---
+  duration_ms: 1.218183
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 189.142562

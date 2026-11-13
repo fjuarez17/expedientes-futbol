@@ -1,0 +1,4 @@
+Para: Telegram
+Objetivo: https://t.example/verpartidohd
+
+Por orden judicial (Dra. Laura Ficticia — Juzgado de Garantías N.º 3 (ficticio) — Distrito Judicial Centro. Orden EXP-2026-000003, firma 545faedf95484251…) se solicita a Telegram retirar la publicación https://t.example/verpartidohd (minuto 7), que promociona la transmisión no autorizada https://verpartido-hd.test/vivo, y preservar los datos de la cuenta que la publicó. Evidencia: expediente EXP-2026-000003, hash a38c1870a55bebb480add4d5334ceea7b800ed220bccb49fb4f74148e504b535.
