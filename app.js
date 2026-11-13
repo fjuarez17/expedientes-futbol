@@ -311,11 +311,13 @@ async function vNuevo(_, qs) {
   <label>URL de la página pirata (donde se ve el reproductor)</label><input id="nUrl" placeholder="https://sitio-pirata.xyz/canal/tnt" inputmode="url">
   <label>URL del video (.m3u8) — opcional, si la tenés de las herramientas de red</label><input id="nVid" placeholder="https://cdn.ejemplo/live/index.m3u8" inputmode="url">
   <label>Detectado por / notas</label><input id="nNote" placeholder="Monitoreo, denuncia de usuario, etc.">
-  <div class="row" style="margin-top:12px"><button onclick="createCase(true)">Crear y analizar</button><button class="ghost" onclick="createCase(false)">Solo crear</button></div>
+  <label class="small" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="nSeal" style="width:auto"> Sellar el expediente al terminar (después ya no se puede agregar la marca de agua ni promociones sin abrir una versión nueva)</label>
+  <p class="small mut">“Crear y verificar” analiza la página, la descarga tal como la entrega el servidor, calcula su SHA-256, la sella con hora oficial RFC 3161 y propone el vencimiento.</p>
+  <div class="row" style="margin-top:12px"><button onclick="createCase(true)">Crear y verificar</button><button class="ghost" onclick="createCase(false)">Solo crear</button></div>
   </div>`;
 }
 window.createCase = async (run) => {
-  const m = matchById($('#nMatch').value); const url = $('#nUrl').value.trim();
+  const m = matchById($('#nMatch').value); const url = $('#nUrl').value.trim(); const sealAfter = !!($('#nSeal') && $('#nSeal').checked);
   if (!m) return toast('Elegí un partido'); if (!hostOf(url)) return toast('URL inválida');
   DB.seq++;
   const c = { id: uid(), num: `EXP-${new Date().getFullYear()}-${String(DB.seq).padStart(4, '0')}`, createdAt: new Date().toISOString(), version: 1,
@@ -324,7 +326,7 @@ window.createCase = async (run) => {
     analysis: null, analysisTsa: null, watermark: null, captures: [], promos: [], expiry: null, seal: null };
   DB.cases.push(c); save(); await audit('expediente_creado', c.id, `${c.num} ${c.target}`);
   location.hash = '#/exp/' + c.id;
-  if (run) setTimeout(() => runAnalysis(c.id), 300);
+  if (run) setTimeout(() => autoVerify(c.id, sealAfter), 300);
 };
 
 async function vExpedientes(_, qs) {
@@ -404,12 +406,12 @@ async function vExp(id) {
 
   <div class="card step ${c.captures.length ? (c.captures.every(x => realTsa(x.tsa)) ? 'done' : 'warn') : ''}"><div class="fig">PASO 4.0</div><h2>Capturas: hashes y sellos de tiempo</h2>
   <p class="small mut">El archivo no sale de tu teléfono: el SHA-256 se calcula localmente y solo el hash viaja a la autoridad de sellado (RFC 3161: FreeTSA y, si no responde, Sectigo). Guardá el archivo original: cualquier alteración cambia el hash.</p>
-  ${ro ? '' : `<label class="btn">+ Agregar capturas (foto/video)<input type="file" multiple accept="image/*,video/*" hidden onchange="addCaptures('${c.id}',this.files)"></label>`}
+  ${ro ? '' : `<button onclick="autoCaptureBtn('${c.id}')">Capturar la página automáticamente</button> <label class="btn">+ Agregar capturas (foto/video)<input type="file" multiple accept="image/*,video/*" hidden onchange="addCaptures('${c.id}',this.files)"></label>`}
   <div id="capStatus"></div>
   <div class="thumbs" style="margin:8px 0">${c.captures.filter(x => x.thumb).map(x => `<img src="${x.thumb}" alt="">`).join('')}</div>
   ${c.captures.map((x, i) => `<div class="card" style="background:var(--card2)"><div class="row sp"><b>${esc(x.name)}</b><span class="small mut">${(x.size / 1024).toFixed(0)} KB · ${esc(x.type)}</span></div>
-   <div class="mono">SHA-256 ${esc(x.sha256)}</div><div class="small mut">Registrada ${fmt(x.addedAt)}</div>${tsaBox(x.tsa)}
-   <div class="row noprint" style="margin-top:6px">${x.tsa && x.tsa.tsr ? `<button class="ghost" onclick="dlTsr('${c.id}',${i})">Descargar sello .tsr</button>` : ''}${!ro && !realTsa(x.tsa) ? `<button class="ghost" onclick="restamp('${c.id}',${i})">Reintentar sello</button>` : ''}</div></div>`).join('')}</div>
+   <div class="mono">SHA-256 ${esc(x.sha256)}</div><div class="small mut">Registrada ${fmt(x.addedAt)}</div>${x.source ? `<div class="small mut">Descargada de ${esc(x.source.finalUrl)} · HTTP ${esc(x.source.httpStatus)}${x.source.title ? ' · “' + esc(x.source.title) + '”' : ''}${x.source.hops && x.source.hops.length ? ` · ${x.source.hops.length} redirección(es)` : ''}${x.source.truncated ? ' · truncada a 2 MB' : ''}</div>` : ''}${tsaBox(x.tsa)}
+   <div class="row noprint" style="margin-top:6px">${x.html64 ? `<button class="ghost" onclick="dlHtml('${c.id}',${i})">Descargar HTML capturado</button>` : ''}${x.tsa && x.tsa.tsr ? `<button class="ghost" onclick="dlTsr('${c.id}',${i})">Descargar sello .tsr</button>` : ''}${!ro && !realTsa(x.tsa) ? `<button class="ghost" onclick="restamp('${c.id}',${i})">Reintentar sello</button>` : ''}</div></div>`).join('')}</div>
 
   <div class="card step ${c.promos.length ? 'done' : ''}"><div class="fig">PASO 5.0</div><h2>Dónde se promocionó el enlace</h2>
   ${ro ? '' : `<div class="grid"><div><label>URL del posteo/mensaje</label><input id="pUrl" placeholder="https://x.com/... · t.me/... · discord.com/..."></div><div><label>Cuenta / canal</label><input id="pAcc" placeholder="@usuario o nombre del canal"></div><div><label>Alcance (seguidores/miembros)</label><input id="pReach" inputmode="numeric"></div></div><label>Captura del posteo (opcional, se hashea)</label><input id="pFile" type="file" accept="image/*"><div class="row" style="margin-top:8px"><button onclick="addPromo('${c.id}')">Agregar</button></div>`}
@@ -458,6 +460,39 @@ window.runAnalysis = async (id) => {
   } catch (e) { toast('Falló el análisis: ' + e.message); }
   route();
 };
+function b64ToBytes(b64) { const s = atob(b64); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+window.autoCapture = async (id) => {
+  const c = getCase(id); if (!c || c.seal) return false;
+  const st = $('#capStatus'); const say = (t) => { if (st) st.innerHTML = `<p><span class="spin"></span> ${t}</p>`; };
+  say(`Descargando ${esc(hostOf(c.target))} tal como la entrega el servidor…`);
+  try {
+    const r = await fetch('/api/capture?url=' + encodeURIComponent(c.target)); const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+    const bytes = b64ToBytes(j.b64); const hash = await sha256Hex(bytes);
+    if (hash !== j.sha256) throw new Error('el hash recalculado no coincide con el del servidor');
+    if (c.captures.some(x => x.sha256 === hash)) { toast('La página no cambió desde la última captura'); return true; }
+    const host = hostOf(j.finalUrl) || 'pagina';
+    const cap = { name: `pagina_${host}_${j.fetchedAt.replace(/[:.]/g, '-')}.html`, size: j.bytes, type: (j.contentType || 'text/html') + ' · captura automática', auto: true, lastModified: j.fetchedAt, addedAt: new Date().toISOString(), sha256: hash, thumb: null,
+      source: { url: c.target, finalUrl: j.finalUrl, httpStatus: j.status, hops: j.hops, headers: j.headers, title: j.title, fetchedAt: j.fetchedAt, truncated: j.truncated, capturer: j.capturer } };
+    if (j.bytes <= 300000) cap.html64 = j.b64;
+    say('Pidiendo sello de tiempo RFC 3161 para la captura…');
+    cap.tsa = await stampFor(c, hash);
+    c.captures.push(cap);
+    try { save(); } catch { delete cap.html64; save(); }
+    await audit('captura_agregada', id, `${cap.name} (automática, HTTP ${j.status}) sha256=${hash}`);
+    return true;
+  } catch (e) { toast('No se pudo capturar la página: ' + e.message); return false; }
+};
+window.autoCaptureBtn = async (id) => { await autoCapture(id); route(); };
+window.autoVerify = async (id, sealAfter) => {
+  await runAnalysis(id);
+  const c = getCase(id); if (!c || c.seal) return;
+  await autoCapture(id);
+  if (!c.expiry) { c.expiry = proposeExpiry(c); save(); await audit('vencimiento_propuesto', id, c.expiry.why); }
+  if (sealAfter) await sealNow(c);
+  route(); toast(`Verificación automática terminada: solidez ${score(c).pct}%`);
+};
+window.dlHtml = (id, i) => { const c = getCase(id), x = c.captures[i]; if (!x.html64) return toast('La página era muy grande para guardarla en el dispositivo; quedó registrado su hash'); download(x.name, new Blob([b64ToBytes(x.html64)], { type: 'text/html' })); };
 window.doWatermark = async (id) => {
   const c = getCase(id); const p = $('#wmIn').value;
   c.watermark = await checkWatermark(c, p); save();
@@ -513,14 +548,17 @@ window.addPromo = async (id) => {
 };
 window.doExpiry = async (id) => { const c = getCase(id); c.expiry = proposeExpiry(c); save(); await audit('vencimiento_propuesto', id, c.expiry.why); route(); };
 window.setUntil = async (id, i, v) => { const c = getCase(id); c.expiry.items[i].until = new Date(v + 'T23:59:00-03:00').toISOString(); c.expiry.edited = true; save(); await audit('vencimiento_editado', id, `${c.expiry.items[i].target} → ${v}`); };
-function sealPayload(c) { const { seal, estado, signature, annexOf, rejection, remoteId, ...rest } = c; const r = JSON.parse(JSON.stringify(rest)); r.captures.forEach(x => delete x.thumb); return r; }
-window.sealCase = async (id) => {
-  const c = getCase(id);
-  if (score(c).pct < 50 && !confirm('El expediente tiene solidez baja. ¿Sellar igual?')) return;
+function sealPayload(c) { const { seal, estado, signature, annexOf, rejection, remoteId, ...rest } = c; const r = JSON.parse(JSON.stringify(rest)); r.captures.forEach(x => { delete x.thumb; delete x.html64; }); return r; }
+async function sealNow(c) {
   const hash = await sha256Hex(stable(sealPayload(c)));
   toast('Sellando…');
   c.seal = { sha256: hash, sealedAt: new Date().toISOString(), tsa: await stampFor(c, hash) }; save();
-  await audit('expediente_sellado', id, `v${c.version} sha256=${hash}`); route();
+  await audit('expediente_sellado', c.id, `v${c.version} sha256=${hash}`);
+}
+window.sealCase = async (id) => {
+  const c = getCase(id);
+  if (score(c).pct < 50 && !confirm('El expediente tiene solidez baja. ¿Sellar igual?')) return;
+  await sealNow(c); route();
 };
 window.reopen = async (id) => {
   const c = getCase(id); if (!confirm('Se abre una nueva versión editable. El sello anterior queda en el historial.')) return;
