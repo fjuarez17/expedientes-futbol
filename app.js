@@ -280,7 +280,8 @@ async function vPanel() {
   </div>
   ${sec('Próximos partidos', upcoming.length ? matchTiles(upcoming) : '<p>Sin partidos próximos cargados. <a href="#/partidos">Agregar partido</a></p>')}
   <div class="card"><div class="row sp"><h2>Últimos expedientes</h2><a href="#/expedientes">Ver todos</a></div><div class="list">${cs.slice(-5).reverse().map(caseRow).join('') || '<p class="mut">Todavía no hay expedientes.</p>'}</div>
-  <div class="row"><a class="btn" href="#/nuevo">+ Nuevo expediente</a><a class="btn" href="#/informe">Informe general (PDF)</a></div></div>
+  <div class="row"><a class="btn" href="#/nuevo">+ Nuevo expediente</a><a class="btn" href="#/informe">Informe general (PDF)</a></div>
+  <div class="row" style="margin-top:10px"><button class="ghost" onclick="loadDemo()">Cargar expediente de demostración</button></div></div>
   <section class="sec"><h3 class="lbl">Cómo funciona</h3><div class="prose"><b>Así se arma un expediente.</b> Elegís el partido y pegás el enlace pirata. La plataforma encuentra el servidor que entrega el video, mide el riesgo colateral, valida la marca de agua y sella cada captura con una autoridad externa. Todo queda en un registro que cualquiera puede verificar.</div></section>`;
 }
 
@@ -909,6 +910,49 @@ async function vAuditoria() {
 }
 
 /* --- Demo --- */
+async function demoCapture(m, pay) {
+  try {
+    const cv = document.createElement('canvas'); cv.width = 640; cv.height = 360; const g = cv.getContext('2d');
+    g.fillStyle = '#1f6b34'; g.fillRect(0, 0, 640, 360); g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 3;
+    g.strokeRect(20, 20, 600, 320); g.beginPath(); g.moveTo(320, 20); g.lineTo(320, 340); g.stroke(); g.beginPath(); g.arc(320, 180, 50, 0, 2 * Math.PI); g.stroke();
+    g.fillStyle = 'rgba(0,0,0,.65)'; g.fillRect(0, 0, 640, 44); g.fillRect(0, 316, 640, 44);
+    g.fillStyle = '#fff'; g.font = 'bold 18px sans-serif'; g.fillText(`${m.home} 0 - 0 ${m.away} · EN VIVO`, 16, 29);
+    g.font = '14px monospace'; g.fillText(`CAPTURA DE DEMOSTRACIÓN · ${new Date().toISOString()}`, 16, 343);
+    g.fillStyle = 'rgba(255,255,255,.18)'; g.font = 'bold 22px monospace'; g.fillText(pay, 150, 250);
+    const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+    return blob ? new File([blob], 'captura-demo.png', { type: 'image/png', lastModified: Date.now() }) : null;
+  } catch { return null; }
+}
+window.loadDemo = async () => {
+  const m = { id: 'm-demo-' + uid(), home: 'Boca Juniors', away: 'River Plate', kickoff: new Date(Date.now() - 35 * 60e3).toISOString(), league: 'Liga Profesional de Fútbol', source: 'demo' };
+  DB.matches.push(m);
+  const pay = await makePayload(m.id, 'ESP', '4F1C09A2');
+  if (!DB.marks.some(k => k.payload === pay)) DB.marks.push({ payload: pay, session: '4F1C09A2', note: 'decodificador #4471 (demo)' });
+  DB.seq++;
+  const c = { id: uid(), demo: true, num: `EXP-${new Date().getFullYear()}-${String(DB.seq).padStart(4, '0')}`, createdAt: new Date().toISOString(), version: 1,
+    match: { id: m.id, home: m.home, away: m.away, kickoff: m.kickoff, league: 'Liga Profesional de Fútbol' }, target: 'https://futbol-gratis-demo.example/en-vivo/espn-premium', videoUrl: null, notes: 'Caso ficticio de demostración (datos de documentación RFC 5737).',
+    analysis: { target: 'https://futbol-gratis-demo.example/en-vivo/espn-premium', startedAt: new Date().toISOString(), analyzer: 'demo', deliveryHost: 'edge7.live-cdn-demo.example', notes: [], rdap: [{ domain: 'futbol-gratis-demo.example', registrar: 'Registrador Demo', abuse: 'abuse@registrador.example', created: '2025-03-01T00:00:00Z', expires: '2027-03-01T00:00:00Z' }],
+      chain: [{ url: 'https://futbol-gratis-demo.example/en-vivo/espn-premium', depth: 0, status: 200, title: 'ESPN Premium EN VIVO gratis', sha256: 'demo' }, { url: 'https://player-demo.example/embed/espn1', depth: 1, status: 200 }],
+      video: [{ url: 'https://edge7.live-cdn-demo.example/hls/espn1/index.m3u8', type: 'HLS (m3u8)', status: 200, segments: ['https://edge7.live-cdn-demo.example/hls/espn1/seg_10233.ts'] }],
+      hosts: [
+        { host: 'futbol-gratis-demo.example', roles: ['pagina'], a: ['192.0.2.10'], aaaa: [], cname: [], ips: [{ ip: '192.0.2.10', asn: 13335, holder: 'CLOUDFLARENET - Cloudflare, Inc.', kind: 'cdn', kindLabel: 'Cloudflare', country: 'US' }], cdnHeader: 'Cloudflare', reverse: { ok: true, count: 500, domains: ['(muestra)'] }, collateral: { level: 'alto', recommendation: 'bloquear_dominio', reason: 'La IP pertenece a una CDN (Cloudflare); bloquearla afectaría a miles de sitios legítimos.' } },
+        { host: 'player-demo.example', roles: ['embed'], a: ['198.51.100.20'], aaaa: [], cname: [], ips: [{ ip: '198.51.100.20', asn: 16276, holder: 'OVH SAS', kind: 'hosting', kindLabel: 'OVHcloud', country: 'FR' }], reverse: null, collateral: { level: 'sin datos', recommendation: 'bloquear_dominio', reason: 'No se pudo determinar cuántos sitios comparten la IP: por prudencia, bloquear por dominio.' } },
+        { host: 'edge7.live-cdn-demo.example', roles: ['manifiesto', 'segmentos'], a: ['203.0.113.77'], aaaa: [], cname: [], ips: [{ ip: '203.0.113.77', asn: 202425, holder: 'IP Volume inc', kind: 'hosting', kindLabel: 'IP Volume', country: 'NL', prefix: '203.0.113.0/24' }], reverse: { ok: true, count: 1, domains: ['edge7.live-cdn-demo.example'] }, collateral: { level: 'bajo', recommendation: 'bloquear_ip_y_dominio', reason: 'La IP aloja 1 dominio(s): servidor dedicado, bloqueo por IP con bajo riesgo colateral.' } },
+      ] },
+    analysisTsa: null, watermark: null, captures: [], promos: [{ platform: 'Telegram', url: 'https://t.me/futbol_gratis_demo/1234', account: 'Fútbol Gratis HD (demo)', reach: '48.000', addedAt: new Date().toISOString() }, { platform: 'X', url: 'https://x.com/demo_futbol/status/1', account: '@demo_futbol', reach: '12.300', addedAt: new Date().toISOString() }], expiry: null, seal: null };
+  c.analysis.reportSha256 = await sha256Hex(stable(c.analysis));
+  c.analysisTsa = await stampFor(c, c.analysis.reportSha256);
+  DB.cases.push(c); c.watermark = await checkWatermark(c, pay); c.expiry = proposeExpiry(c); save();
+  await audit('demo_cargada', c.id, c.num);
+  const f = await demoCapture(m, pay);
+  if (f) {
+    const hash = await sha256File(f);
+    c.captures.push({ name: f.name, size: f.size, type: f.type, lastModified: new Date(f.lastModified).toISOString(), addedAt: new Date().toISOString(), sha256: hash, thumb: await thumbOf(f), tsa: await stampFor(c, hash) }); save();
+    await audit('captura_agregada', c.id, `${f.name} sha256=${hash}`);
+  }
+  location.hash = '#/exp/' + c.id;
+};
+
 /* ===== Inicio ===== */
 $('#menuBtn').onclick = () => document.body.classList.toggle('menu');
 $('#nav').addEventListener('click', (e) => { if (e.target.closest('a')) document.body.classList.remove('menu'); });
