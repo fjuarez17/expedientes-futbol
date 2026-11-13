@@ -11,6 +11,7 @@ Por eso cada afirmación de esta carpeta apunta a un archivo, a una función o a
 | `datos_ficticios.py` | Comprueba que las salidas solo tengan dominios `.test`/`.example` e IPs RFC 5737. |
 | `PRIORIDADES.md` | Lo que falta o es débil, ordenado por impacto en la evaluación. |
 | `REVISION.md` | Protocolo para la revisión de "peces dorados" (lectores sin contexto) y registro de sus hallazgos. |
+| `ci/auditoria.yml` | Workflow de GitHub Actions que corre `correr.sh` en cada push (copiar a `.github/workflows/`). |
 | `corridas/` | Resultados guardados. Cada corrida tiene el commit, la evaluación oficial y un `MANIFIESTO.sha256`. |
 
 ## Cómo auditar un cambio
@@ -21,7 +22,7 @@ cat auditoria/corridas/*/resumen.txt | tail -n 40
 ```
 
 Regla del equipo: **un cambio que toca el núcleo entra solo con una corrida nueva en `corridas/`** que no empeore el resumen de `verificar.py`.
-GitHub Actions corre lo mismo en cada push y PR (`.github/workflows/auditoria.yml`) y deja la corrida como *artifact*.
+GitHub Actions puede correr lo mismo en cada push y PR: `ci/auditoria.yml` está listo, pero hay que copiarlo a `.github/workflows/` desde la web de GitHub (el token con el que se subió esta rama no tiene permiso para crear workflows).
 
 ## Alcance: hay dos plataformas en el repo
 
