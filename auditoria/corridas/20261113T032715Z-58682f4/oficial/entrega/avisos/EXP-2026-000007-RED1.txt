@@ -1,0 +1,4 @@
+Para: Discord
+Objetivo: https://discord.example/invite/tribuna-vip
+
+Por orden judicial (Dr. Martín Ejemplo — Juzgado de Garantías N.º 1 (ficticio) — Distrito Judicial Norte. Orden EXP-2026-000007, firma d3720adc1740fe42…) se solicita a Discord retirar la publicación https://discord.example/invite/tribuna-vip (minuto 53), que promociona la transmisión no autorizada https://tribuna-pirata.test/ver, y preservar los datos de la cuenta que la publicó. Evidencia: expediente EXP-2026-000007, hash 524984a6145d88d1ba6cebbc87dd331f7dcf5e81b879c9bfb92011768aa5c8c1.

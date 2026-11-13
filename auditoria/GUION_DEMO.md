@@ -29,14 +29,17 @@ Grabar sobre un partido de práctica con `--acelerar 6` (17,5 min reales) y reco
 3. Arrancar el motor con una salida limpia (no pisar la de práctica):
    ```bash
    cd desafio-simulador
-   python3 plataforma/servidor.py --simulador http://<ip>:8080 --salida entrega/final
+   python3 plataforma/servidor.py --simulador http://<ip>:8080 --salida entrega/final --https
    ```
-4. Jueces en celulares: `http://<ip-de-la-compu>:8090/` con `laura` y `martin` (`plataforma/README.md`), una persona
+4. Jueces en celulares: `https://<ip-de-la-compu>:8090/` (aceptar el certificado autofirmado; ensayarlo antes) con `laura` y `martin`
+   (`plataforma/README.md`). Cada celular firma con su propia clave: verificar que diga «Firma desde este dispositivo: … huella». Una persona
    por juez, sonido activado. **No usar `juez_automatico.py` en la final**: firma sin intervención humana y la consigna
    pide que nadie firme en nombre del juez. Cada minuto sin firmar cuesta Velocidad (ver nota en `auditoria/README.md`).
 5. Al terminar (después de los 5 minutos de gracia):
    ```bash
    python3 plataforma/servidor.py --verificar-auditoria entrega/final/auditoria.jsonl
+   python3 plataforma/servidor.py --verificar-firmas entrega/final/plataforma.json
+   python3 plataforma/servidor.py --verificar-sellos entrega/final/sellos
    python3 plataforma/expedientes.py --verificar entrega/final/expedientes.json
    python3 plataforma/informe_pdf.py --entrada entrega/final/expedientes.json --salida entrega/final/informe_expedientes.pdf
    ```

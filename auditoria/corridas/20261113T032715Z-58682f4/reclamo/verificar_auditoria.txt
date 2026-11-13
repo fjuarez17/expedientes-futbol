@@ -1,0 +1,1 @@
+OK: 255 entradas de auditoría íntegras. Hash final 17ad4bfecfc4b15d32fa2b34b65fd1a0038c6cdd7ce1de6863dad2161a16f140

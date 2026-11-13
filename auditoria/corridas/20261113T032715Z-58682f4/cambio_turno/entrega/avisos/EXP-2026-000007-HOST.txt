@@ -1,0 +1,4 @@
+Para: AS64600 Bruma Hosting Dedicado (ficticio)
+Objetivo: x10.tribuna-pirata.test (203.0.113.41)
+
+Por orden judicial (Dr. Martín Ejemplo — Juzgado de Garantías N.º 1 (ficticio) — Distrito Judicial Norte. Orden EXP-2026-000007, firma 1cf232886fe25128…) se informa que el servidor 203.0.113.41 de su red entrega la transmisión no autorizada https://x10.tribuna-pirata.test/hls/en-vivo/index.m3u8 del partido «practica-01», titular Liga Profesional Ficticia. Se solicita: 1) suspender el servicio al cliente que opera ese servidor; 2) preservar los registros de contratación, pago y acceso; 3) no reasignarle otra IP para el mismo uso. Evidencia: expediente EXP-2026-000007, hash 8a575872cd53f39d3351ccf16685cf0292683ed51dad70d99df6edef93a8a473.

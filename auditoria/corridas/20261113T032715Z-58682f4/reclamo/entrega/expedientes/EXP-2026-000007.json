@@ -1,0 +1,202 @@
+{
+  "expediente_id": "EXP-2026-000007",
+  "abierto_utc": "2026-11-13T03:29:59.828+00:00",
+  "partido": "practica-01",
+  "titular_derechos": "Liga Profesional Ficticia",
+  "sitio": "tribuna-pirata.test",
+  "pagina": "https://tribuna-pirata.test/ver",
+  "fase_del_sitio": 2,
+  "expedientes_previos_del_sitio": [
+    "EXP-2026-000005"
+  ],
+  "cambio_de_servidor": true,
+  "verificacion_marca": {
+    "resultado": "senal_oficial",
+    "es_senal_del_partido": true,
+    "marca": "LP26-PRA-OFI-S063002",
+    "prefijo": "LP26-PRA-OFI",
+    "detalle": "La marca LP26-PRA-OFI-S063002 coincide con el prefijo LP26-PRA-OFI (Señal oficial del titular (plataforma propia)) y no corresponde a ningún licenciatario."
+  },
+  "servidor": {
+    "stream_url": "https://x10.tribuna-pirata.test/hls/en-vivo/index.m3u8",
+    "host_stream": "x10.tribuna-pirata.test",
+    "ip": "203.0.113.41",
+    "asn": 64600,
+    "organizacion_asn": "Bruma Hosting Dedicado (ficticio)",
+    "ips_vistas_para_el_host": [
+      {
+        "ip": "203.0.113.41",
+        "asn": 64600,
+        "organizacion": "Bruma Hosting Dedicado (ficticio)"
+      }
+    ],
+    "nota": "Se bloquea el servidor que entrega el video, no la página del reproductor."
+  },
+  "riesgo_colateral": {
+    "ip": "203.0.113.41",
+    "asn": 64600,
+    "organizacion_asn": "Bruma Hosting Dedicado (ficticio)",
+    "dominios_en_la_ip": [
+      "x10.tribuna-pirata.test"
+    ],
+    "dominios_del_mismo_sitio": [
+      "x10.tribuna-pirata.test"
+    ],
+    "dominios_de_terceros": [],
+    "ip_compartida": false,
+    "bloqueo_recomendado": "ip",
+    "objetivo": "203.0.113.41",
+    "motivo": "La IP 203.0.113.41 solo aloja dominios del propio sitio (x10.tribuna-pirata.test): bloqueo por IP sin daño colateral conocido; corta también subdominios espejo."
+  },
+  "pedido": {
+    "tipo": "ip",
+    "objetivo": "203.0.113.41",
+    "vence_min": 105,
+    "vence_hora": "2026-11-11T19:45:00-03:00",
+    "fundamento_vencimiento": "Vence al terminar el partido (minuto 105); los bloqueos por IP no deben quedar activos después."
+  },
+  "primera_deteccion_min": 82.0,
+  "ultima_deteccion_min": 102.0,
+  "promocion": [
+    {
+      "red": "discord",
+      "url": "https://discord.example/invite/tribuna-vip",
+      "minuto": 53.0
+    },
+    {
+      "red": "telegram",
+      "url": "https://t.example/tribunapirata",
+      "minuto": 54.0
+    }
+  ],
+  "evidencia": [
+    {
+      "deteccion_id": "D-0034",
+      "minuto_partido": 82.0,
+      "captura_min": 82.0,
+      "captura_hora": "2026-11-11T19:22:00-03:00",
+      "recibida_por_plataforma_utc": "2026-11-13T03:29:59.826+00:00",
+      "captura_formato": "mpegts",
+      "captura_duracion_seg": 6,
+      "captura_bytes": 64,
+      "sha256_captura": "767fccc3e8c85585c487925e6d3b8f51e3dd4d796d61cebb11fc2b6e9b2828ee",
+      "sha256_deteccion": "ff9e63b1fa50ab2e458c5ad6019b2e610fa2d606c8067fd6c166d36cfc814d68",
+      "hash_previo": "df82de3f34e38ed3e7ab74d639ac888bf26e6bb5cdbf8a484ac4e2c7803ab871",
+      "deteccion_original": {
+        "id": "D-0034",
+        "minuto": 82.0,
+        "pagina": "https://tribuna-pirata.test/ver",
+        "stream_url": "https://x10.tribuna-pirata.test/hls/en-vivo/index.m3u8",
+        "host_stream": "x10.tribuna-pirata.test",
+        "ip_servidor": "203.0.113.41",
+        "asn": 64600,
+        "marca_de_agua_extraida": "LP26-PRA-OFI-S063002",
+        "captura": {
+          "capturada_min": 82.0,
+          "formato": "mpegts",
+          "duracion_seg": 6,
+          "contenido_b64": "R6VWz/XEpDLRE3L0IVUXZgJLzsy2JgoVxDZb+CmnTa5fue8v5LlzyuzYyUon2CnqfjvSZHfvIE4Qv1a41foqCw=="
+        },
+        "promocion": [
+          {
+            "red": "discord",
+            "url": "https://discord.example/invite/tribuna-vip",
+            "minuto": 53.0
+          },
+          {
+            "red": "telegram",
+            "url": "https://t.example/tribunapirata",
+            "minuto": 54.0
+          }
+        ]
+      },
+      "hash_encadenado": "5d7481b38c87b908d932e3909e32700c157d517f3c6d10bee02652659e5caf80"
+    },
+    {
+      "deteccion_id": "D-0039",
+      "minuto_partido": 92.0,
+      "captura_min": 92.0,
+      "captura_hora": "2026-11-11T19:32:00-03:00",
+      "recibida_por_plataforma_utc": "2026-11-13T03:30:19.961+00:00",
+      "captura_formato": "mpegts",
+      "captura_duracion_seg": 6,
+      "captura_bytes": 64,
+      "sha256_captura": "251796ec5a50f39186ddc58702ae2b6c09f2ac2101528d40e71a695c08fb41dd",
+      "sha256_deteccion": "42bb67539499f048893661928cbe39e4162d26ef8134f7543cc03962c7059617",
+      "hash_previo": "a31443d675e62e552cd8e5a502e757381ef01ecd7b786c6261c95327f191019e",
+      "deteccion_original": {
+        "id": "D-0039",
+        "minuto": 92.0,
+        "pagina": "https://tribuna-pirata.test/ver",
+        "stream_url": "https://x10.tribuna-pirata.test/hls/en-vivo/index.m3u8",
+        "host_stream": "x10.tribuna-pirata.test",
+        "ip_servidor": "203.0.113.41",
+        "asn": 64600,
+        "marca_de_agua_extraida": "LP26-PRA-OFI-S063002",
+        "captura": {
+          "capturada_min": 92.0,
+          "formato": "mpegts",
+          "duracion_seg": 6,
+          "contenido_b64": "R/RVbNx/t/7TMz25Yr1pu3FBuE2JewPxafpsjjaA3ZVS5kzRyYXJ4ftyEwotRMAMTPO7pRGC6qlGCFGhG8ijGg=="
+        },
+        "promocion": [
+          {
+            "red": "discord",
+            "url": "https://discord.example/invite/tribuna-vip",
+            "minuto": 53.0
+          },
+          {
+            "red": "telegram",
+            "url": "https://t.example/tribunapirata",
+            "minuto": 54.0
+          }
+        ]
+      },
+      "hash_encadenado": "84b358730456af05a022b3edbed45c770af4945ab6320a5b458754a8244dbea9"
+    },
+    {
+      "deteccion_id": "D-0043",
+      "minuto_partido": 102.0,
+      "captura_min": 102.0,
+      "captura_hora": "2026-11-11T19:42:00-03:00",
+      "recibida_por_plataforma_utc": "2026-11-13T03:30:40.098+00:00",
+      "captura_formato": "mpegts",
+      "captura_duracion_seg": 6,
+      "captura_bytes": 64,
+      "sha256_captura": "cdae9850e2f0202d95cda22aa487785987580ad8d3b40498410ba8c120fd09bd",
+      "sha256_deteccion": "160be00647d1ec24e18fb66d6a6241f7db2cdc2a790c17fcbf95d36270d99f30",
+      "hash_previo": "7b8b9f031f71499d1cd826667ef5af5c8790fbae6e5d0e317558f45f747a718e",
+      "deteccion_original": {
+        "id": "D-0043",
+        "minuto": 102.0,
+        "pagina": "https://tribuna-pirata.test/ver",
+        "stream_url": "https://x10.tribuna-pirata.test/hls/en-vivo/index.m3u8",
+        "host_stream": "x10.tribuna-pirata.test",
+        "ip_servidor": "203.0.113.41",
+        "asn": 64600,
+        "marca_de_agua_extraida": "LP26-PRA-OFI-S063002",
+        "captura": {
+          "capturada_min": 102.0,
+          "formato": "mpegts",
+          "duracion_seg": 6,
+          "contenido_b64": "Rwn+zn0jeSBa5eVMBSlEj8H36UUiiJjU83zGTID50B1GKPHeNdUHsFWfhGjUDINNnQ4gyFEYsq+Pd6Ar612SQw=="
+        },
+        "promocion": [
+          {
+            "red": "discord",
+            "url": "https://discord.example/invite/tribuna-vip",
+            "minuto": 53.0
+          },
+          {
+            "red": "telegram",
+            "url": "https://t.example/tribunapirata",
+            "minuto": 54.0
+          }
+        ]
+      },
+      "hash_encadenado": "f13e5274ea98f7686b95f633af403574df2193e0012d60e328df308f2779c7e4"
+    }
+  ],
+  "estado": "pendiente_de_juez",
+  "hash_expediente": "8e16a1c90e72a7ad9fd0b0222bd04e4613c68aae64798e93c0cb38699a7f4eb1"
+}

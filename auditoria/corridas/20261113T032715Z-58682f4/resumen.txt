@@ -1,0 +1,74 @@
+commit: 58682f4da5c5a112cdb17a90222b413444ef8904
+archivos modificados sin commit (fuera de auditoria/): 0
+fecha UTC: 2026-11-13T03:27:15Z
+aceleracion: x30
+
+== 1. Pruebas unitarias de la app web (node --test)
+OK: # pass 15
+
+== 2. Tres partidos de práctica en paralelo contra el simulador oficial
+oficial: 99 eventos del simulador
+cambio_turno: 99 eventos del simulador
+reclamo: 105 eventos del simulador
+
+== 3. Partido oficial: evaluación oficial (evaluacion/verificar.py)
+Resumen
+  fases piratas bloqueadas: 7 de 7
+  visibilidad residual promedio pct: 3.9
+  ordenes recibidas: 33
+  ordenes aplicadas: 30
+  ordenes fallidas: 3
+  ordenes rechazadas: 0
+  bloqueos con dano colateral: 0
+  dominios legitimos afectados: 0
+  bloqueos falsos positivos: 0
+  bloqueos ip activos post partido: 0
+  reclamos: 0
+  reclamos resueltos por levantamiento: 0
+  ordenes firmadas fuera de turno: 0
+
+OK: 245 entradas de auditoría íntegras. Hash final 3467ecad8de186a06f1ac37852540106ea3a3a3787f93ffa3b3cf7ed5fd337d7
+OK: 7 expedientes y 38 evidencias íntegras.
+OK: 55 sellos RFC 3161 corresponden a sus hashes
+OK: 7 firmas de juez verificadas con la clave pública de su dispositivo
+OK: 38 capturas
+IPs fuera de RFC 5737: 0
+dominios fuera de .test/.example: 0
+
+== 4. Cambio de turno con la jueza saliente ausente
+pendientes reasignados al juez entrante: 4
+decisiones firmadas por el juez entrante: 7 · por la jueza saliente: 0
+firmas rechazadas a la jueza fuera de turno: 1
+fases piratas bloqueadas: 6 de 7
+ordenes firmadas fuera de turno: 0
+OK: 254 entradas de auditoría íntegras. Hash final e8aa10f82f21e6da3e7168df44e3de0770a16b504250d5489b526cbf56aa7aa0
+OK: 7 expedientes y 38 evidencias íntegras.
+OK: 56 sellos RFC 3161 corresponden a sus hashes
+OK: 7 firmas de juez verificadas con la clave pública de su dispositivo
+OK: 38 capturas
+IPs fuera de RFC 5737: 0
+dominios fuera de .test/.example: 0
+
+== 5. Reclamo de un sitio legítimo (bloqueo IP forzado sobre live.golazo-libre.test)
+5. Reclamos de sitios afectados
+  R-001 noticias-del-valle.test (aurora, min 9.9): levantada en 0.2 min
+
+reclamo_recibido: 1
+reclamo_verificado: 1
+reclamo_decidido: 1
+orden_levantada: 3
+reclamos resueltos por levantamiento: 1 de 1
+(el daño colateral de este partido es esperado: el bloqueo por IP compartida se fuerza a propósito)
+OK: 255 entradas de auditoría íntegras. Hash final 17ad4bfecfc4b15d32fa2b34b65fd1a0038c6cdd7ce1de6863dad2161a16f140
+OK: 7 expedientes y 38 evidencias íntegras.
+OK: 56 sellos RFC 3161 corresponden a sus hashes
+OK: 9 firmas de juez verificadas con la clave pública de su dispositivo
+OK: 38 capturas
+IPs fuera de RFC 5737: 0
+dominios fuera de .test/.example: 0
+
+== 6. Huella de la corrida
+sha256 del manifiesto: 025a26d273f139392ab1d7d3190ffe51937387c9d54b47de3d0d770bb4d3f374
+
+== 7. Veredicto
+NÚCLEO OK · CAMBIO DE TURNO OK · RECLAMO OK
