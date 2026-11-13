@@ -1,4 +1,4 @@
--- Motor del simulador ↔ Supabase (correr después de schema.sql, una sola vez)
+-- Motor del simulador ↔ Supabase (correr después de schema.sql; se puede volver a correr)
 -- El motor (desafio-simulador/plataforma) lee el simulador, publica expedientes en la cola,
 -- toma las firmas de la app y manda las órdenes a los proveedores del simulador.
 
@@ -36,5 +36,14 @@ create policy reclamos_juez_decide on reclamos for update using (
   exists (select 1 from turnos t where t.juez_id = auth.uid() and now() between t.desde and t.hasta))
   with check (decidido_por = auth.uid() and estado in ('aceptado', 'rechazado'));
 
-alter publication supabase_realtime add table ordenes;
-alter publication supabase_realtime add table reclamos;
+-- Realtime: se agregan solo si todavía no están (así el script se puede volver a correr)
+do $$
+declare t text;
+begin
+  foreach t in array array['ordenes', 'reclamos'] loop
+    if not exists (select 1 from pg_publication_tables
+                   where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
