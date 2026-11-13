@@ -7,6 +7,7 @@ a{color:var(--w);text-decoration:none}a:hover{text-decoration:underline}
 #menuBtn{justify-self:end;width:44px;height:44px;border-radius:50%;background:var(--k);border:0;padding:0;display:flex;flex-direction:column;gap:5px;align-items:center;justify-content:center;cursor:pointer;position:relative;z-index:41}
 #menuBtn i{display:block;width:17px;height:2px;background:var(--ac);transition:.25s}
 nav{position:fixed;inset:0;z-index:40;background:var(--k);padding:92px 22px 30px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;opacity:0;visibility:hidden;transition:opacity .25s,visibility .25s}
+body.menu nav{opacity:1;visibility:visible}
 nav a{color:var(--w);font-weight:700;font-size:clamp(26px,5.5vw,46px);letter-spacing:-.02em;line-height:1.15;display:flex;align-items:baseline;gap:16px;max-width:860px;margin:0 auto;width:100%;padding:8px 0;border-bottom:1px solid #162616}
 nav a em{font-style:normal;font-size:13px;font-weight:800;color:var(--ac);letter-spacing:.06em;min-width:24px}
 nav a:hover,nav a.on{color:var(--ac);text-decoration:none}
