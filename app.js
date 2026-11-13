@@ -8,6 +8,53 @@ async function sha256Hex(data) {
   const h = await crypto.subtle.digest('SHA-256', buf);
   return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
+const K256 = new Uint32Array([0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2]);
+// SHA-256 incremental: WebCrypto no hashea por partes y un video entero en memoria puede colgar el celular.
+class Sha256 {
+  constructor() { this.h = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]); this.buf = new Uint8Array(64); this.bl = 0; this.len = 0; this.w = new Uint32Array(64); }
+  block(d, o) {
+    const w = this.w, h = this.h;
+    for (let i = 0; i < 16; i++) w[i] = (d[o + 4 * i] << 24) | (d[o + 4 * i + 1] << 16) | (d[o + 4 * i + 2] << 8) | d[o + 4 * i + 3];
+    for (let i = 16; i < 64; i++) {
+      const a = w[i - 15], b = w[i - 2];
+      w[i] = (w[i - 16] + (((a >>> 7) | (a << 25)) ^ ((a >>> 18) | (a << 14)) ^ (a >>> 3)) + w[i - 7] + (((b >>> 17) | (b << 15)) ^ ((b >>> 19) | (b << 13)) ^ (b >>> 10))) | 0;
+    }
+    let A = h[0], B = h[1], C = h[2], D = h[3], E = h[4], F = h[5], G = h[6], H = h[7];
+    for (let i = 0; i < 64; i++) {
+      const t1 = (H + (((E >>> 6) | (E << 26)) ^ ((E >>> 11) | (E << 21)) ^ ((E >>> 25) | (E << 7))) + ((E & F) ^ (~E & G)) + K256[i] + w[i]) | 0;
+      const t2 = ((((A >>> 2) | (A << 30)) ^ ((A >>> 13) | (A << 19)) ^ ((A >>> 22) | (A << 10))) + ((A & B) ^ (A & C) ^ (B & C))) | 0;
+      H = G; G = F; F = E; E = (D + t1) | 0; D = C; C = B; B = A; A = (t1 + t2) | 0;
+    }
+    h[0] += A; h[1] += B; h[2] += C; h[3] += D; h[4] += E; h[5] += F; h[6] += G; h[7] += H;
+  }
+  update(d) {
+    let i = 0; this.len += d.length;
+    if (this.bl) {
+      i = Math.min(64 - this.bl, d.length); this.buf.set(d.subarray(0, i), this.bl); this.bl += i;
+      if (this.bl < 64) return this;
+      this.block(this.buf, 0); this.bl = 0;
+    }
+    for (; i + 64 <= d.length; i += 64) this.block(d, i);
+    if (i < d.length) { this.buf.set(d.subarray(i)); this.bl = d.length - i; }
+    return this;
+  }
+  hex() {
+    const bits = this.len * 8, pad = new Uint8Array((this.bl < 56 ? 56 : 120) - this.bl + 8);
+    pad[0] = 0x80; const dv = new DataView(pad.buffer);
+    dv.setUint32(pad.length - 8, Math.floor(bits / 2 ** 32)); dv.setUint32(pad.length - 4, bits >>> 0);
+    this.update(pad);
+    return [...this.h].map(x => x.toString(16).padStart(8, '0')).join('');
+  }
+}
+async function sha256File(f, onProgress) {
+  if (f.size <= 64 * 2 ** 20) return sha256Hex(await f.arrayBuffer());
+  const h = new Sha256(), CH = 4 * 2 ** 20;
+  for (let o = 0; o < f.size; o += CH) {
+    h.update(new Uint8Array(await f.slice(o, o + CH).arrayBuffer()));
+    if (onProgress) onProgress(Math.min(1, (o + CH) / f.size));
+  }
+  return h.hex();
+}
 function stable(v) {
   if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
   if (v && typeof v === 'object') return '{' + Object.keys(v).sort().filter(k => v[k] !== undefined).map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
@@ -167,16 +214,16 @@ function score(c) {
     ['Proveedor (ASN) identificado', 10, !!(dh && dh.ips[0] && dh.ips[0].asn)],
     ['Riesgo colateral evaluado', 10, !!(dh && dh.collateral)],
     ['Capturas con hash SHA-256', 10, c.captures.length > 0],
-    ['Capturas con sello de tiempo RFC 3161', 10, c.captures.length > 0 && c.captures.every(x => x.tsa && x.tsa.genTime)],
+    ['Capturas con sello de tiempo RFC 3161' + (c.captures.some(x => x.tsa && x.tsa.demo) ? ' (sello simulado DEMO: no suma)' : ''), 10, c.captures.length > 0 && c.captures.every(x => realTsa(x.tsa))],
     ['Promoción del enlace documentada', 5, c.promos.length > 0],
     ['Vencimiento propuesto', 5, !!c.expiry],
-    ['Expediente sellado', 5, !!c.seal],
+    ['Expediente sellado' + (c.seal && c.seal.tsa && c.seal.tsa.demo ? ' (sello simulado DEMO: no suma)' : ''), 5, !!(c.seal && realTsa(c.seal.tsa))],
   ];
   return { items, pct: items.reduce((s, [, w, ok]) => s + (ok ? w : 0), 0) };
 }
 
 /* ===== Router ===== */
-const routes = { panel: vPanel, partidos: vPartidos, expedientes: vExpedientes, exp: vExp, nuevo: vNuevo, conocimiento: vConocimiento, licencias: vLicencias, verificar: vVerificar, auditoria: vAuditoria, informe: vInforme };
+const routes = { panel: vPanel, partidos: vPartidos, expedientes: vExpedientes, exp: vExp, nuevo: vNuevo, conocimiento: vConocimiento, licencias: vLicencias, pruebas: vPruebas, verificar: vVerificar, auditoria: vAuditoria, informe: vInforme };
 async function route() {
   const [path, qs] = (location.hash.slice(2) || 'panel').split('?');
   const [name, arg] = path.split('/');
@@ -314,7 +361,14 @@ function hostCard(h, isDelivery) {
 function tsaBox(t, label) {
   if (!t) return '';
   if (t.error) return `<div class="stamp small" style="border-color:var(--bad)">Sello no obtenido: ${esc(t.error)}</div>`;
+  if (t.demo) return `<div class="stamp small" style="border-color:var(--warn)"><span class="pill warn">DEMO</span> <b>${esc(label || 'Sello de tiempo')}</b>: sello simulado (${esc(t.genTime)}), sin valor probatorio y sin .tsr. No suma solidez ni se puede publicar. Las TSAs no respondieron: ${esc(t.reason || '')}</div>`;
   return `<div class="stamp small">🕒 <b>${esc(label || 'Sello de tiempo')}</b>: ${fmt(t.genTime)} (${esc(t.genTime)}) · ${esc(t.tsa)} · ${t.imprintPresent ? 'hash incluido en el sello ✔' : 'revisar'}</div>`;
+}
+function verifyHint(hash, t) {
+  if (!realTsa(t)) return '';
+  const ca = !t.tsaId || t.tsaId === 'freetsa' ? '-CAfile cacert.pem -untrusted tsa.crt' : '-CAfile /etc/ssl/certs/ca-certificates.crt';
+  const note = !t.tsaId || t.tsaId === 'freetsa' ? 'certificados en freetsa.org' : 'el certificado de la TSA viene dentro del sello; la raíz está en el almacén del sistema';
+  return `<p class="small mut">Verificación externa: <span class="mono">openssl ts -verify -digest ${esc(hash)} -in sello.tsr ${ca}</span> (${note}).</p>`;
 }
 async function vExp(id) {
   const c = getCase(id); if (!c) return '<p>Expediente no encontrado. <a href="#/expedientes">Volver</a></p>';
@@ -348,16 +402,16 @@ async function vExp(id) {
    <h3>Infraestructura y riesgo colateral (punto 3)</h3>${a.hosts.sort((x, y) => (y.host === a.deliveryHost) - (x.host === a.deliveryHost)).map(h => hostCard(h, h.host === a.deliveryHost)).join('')}
    ${a.rdap.length ? `<h3>Registro de dominio (RDAP)</h3><div class="tbl"><table><tr><th>Dominio</th><th>Registrador</th><th>Abuso</th><th>Alta</th><th>Vence</th></tr>${a.rdap.map(r => `<tr><td class="mono">${esc(r.domain)}</td><td>${esc(r.registrar || '—')}</td><td class="mono">${esc(r.abuse || '—')}</td><td>${fmtD(r.created)}</td><td>${fmtD(r.expires)}</td></tr>`).join('')}</table></div>` : ''}
    <div class="small mut" style="margin-top:6px">Análisis ${fmt(a.startedAt)} · ${esc(a.analyzer)} · hash del informe <span class="mono">${esc(a.reportSha256)}</span></div>
-   ${tsaBox(c.analysisTsa, 'Sello del informe técnico')}` : ''}</div>
+   ${tsaBox(c.analysisTsa, 'Sello del informe técnico')}${!ro && c.analysisTsa && !realTsa(c.analysisTsa) ? `<div class="row noprint" style="margin-top:6px"><button class="ghost" onclick="restampReport('${c.id}')">Reintentar sello</button></div>` : ''}` : ''}</div>
 
-  <div class="card step ${c.captures.length ? (c.captures.every(x => x.tsa && x.tsa.genTime) ? 'done' : 'warn') : ''}"><div class="fig">PASO 4.0</div><h2>Capturas: hashes y sellos de tiempo</h2>
-  <p class="small mut">El archivo no sale de tu teléfono: el SHA-256 se calcula localmente y solo el hash viaja a la autoridad de sellado (FreeTSA, RFC 3161). Guardá el archivo original: cualquier alteración cambia el hash.</p>
+  <div class="card step ${c.captures.length ? (c.captures.every(x => realTsa(x.tsa)) ? 'done' : 'warn') : ''}"><div class="fig">PASO 4.0</div><h2>Capturas: hashes y sellos de tiempo</h2>
+  <p class="small mut">El archivo no sale de tu teléfono: el SHA-256 se calcula localmente y solo el hash viaja a la autoridad de sellado (RFC 3161: FreeTSA y, si no responde, Sectigo). Guardá el archivo original: cualquier alteración cambia el hash.</p>
   ${ro ? '' : `<label class="btn">+ Agregar capturas (foto/video)<input type="file" multiple accept="image/*,video/*" hidden onchange="addCaptures('${c.id}',this.files)"></label>`}
   <div id="capStatus"></div>
   <div class="thumbs" style="margin:8px 0">${c.captures.filter(x => x.thumb).map(x => `<img src="${x.thumb}" alt="">`).join('')}</div>
   ${c.captures.map((x, i) => `<div class="card" style="background:var(--card2)"><div class="row sp"><b>${esc(x.name)}</b><span class="small mut">${(x.size / 1024).toFixed(0)} KB · ${esc(x.type)}</span></div>
    <div class="mono">SHA-256 ${esc(x.sha256)}</div><div class="small mut">Registrada ${fmt(x.addedAt)}</div>${tsaBox(x.tsa)}
-   <div class="row noprint" style="margin-top:6px">${x.tsa && x.tsa.tsr ? `<button class="ghost" onclick="dlTsr('${c.id}',${i})">Descargar sello .tsr</button>` : ''}${!ro && (!x.tsa || !x.tsa.genTime) ? `<button class="ghost" onclick="restamp('${c.id}',${i})">Reintentar sello</button>` : ''}</div></div>`).join('')}</div>
+   <div class="row noprint" style="margin-top:6px">${x.tsa && x.tsa.tsr ? `<button class="ghost" onclick="dlTsr('${c.id}',${i})">Descargar sello .tsr</button>` : ''}${!ro && !realTsa(x.tsa) ? `<button class="ghost" onclick="restamp('${c.id}',${i})">Reintentar sello</button>` : ''}</div></div>`).join('')}</div>
 
   <div class="card step ${c.promos.length ? 'done' : ''}"><div class="fig">PASO 5.0</div><h2>Dónde se promocionó el enlace</h2>
   ${ro ? '' : `<div class="grid"><div><label>URL del posteo/mensaje</label><input id="pUrl" placeholder="https://x.com/... · t.me/... · discord.com/..."></div><div><label>Cuenta / canal</label><input id="pAcc" placeholder="@usuario o nombre del canal"></div><div><label>Alcance (seguidores/miembros)</label><input id="pReach" inputmode="numeric"></div></div><label>Captura del posteo (opcional, se hashea)</label><input id="pFile" type="file" accept="image/*"><div class="row" style="margin-top:8px"><button onclick="addPromo('${c.id}')">Agregar</button></div>`}
@@ -367,10 +421,10 @@ async function vExp(id) {
   ${ro ? '' : `<button class="ghost" onclick="doExpiry('${c.id}')" ${a ? '' : 'disabled'}>${c.expiry ? 'Recalcular' : 'Proponer vencimiento'}</button>${a ? '' : ' <span class="small mut">(requiere análisis)</span>'}`}
   ${c.expiry ? `<p class="small">${esc(c.expiry.why)}</p><div class="tbl"><table><tr><th>Objetivo</th><th>Método</th><th>Vence</th></tr>${c.expiry.items.map((it, i) => `<tr><td>${esc(it.target)}${it.note ? `<div class="small mut">${esc(it.note)}</div>` : ''}</td><td>${esc(it.method)}</td><td>${it.until ? (ro ? fmt(it.until) : `<input type="date" value="${it.until.slice(0, 10)}" onchange="setUntil('${c.id}',${i},this.value)">`) : '—'}</td></tr>`).join('')}</table></div>` : ''}</div>
 
-  <div class="card step ${c.seal ? 'done' : ''}"><div class="fig">PASO 7.0</div><h2>Sellado del expediente</h2>
+  <div class="card step ${c.seal ? (realTsa(c.seal.tsa) ? 'done' : 'warn') : ''}"><div class="fig">PASO 7.0</div><h2>Sellado del expediente</h2>
   ${c.seal ? `<div class="verdict ok">Expediente sellado. Hash SHA-256 del contenido:</div><div class="mono">${esc(c.seal.sha256)}</div>${tsaBox(c.seal.tsa, 'Sello del expediente')}
-   <div class="row noprint" style="margin-top:8px">${c.seal.tsa && c.seal.tsa.tsr ? `<button class="ghost" onclick="dlSealTsr('${c.id}')">Descargar sello .tsr</button>` : ''}<button class="ghost" onclick="reopen('${c.id}')">Nueva versión</button></div>
-   <p class="small mut">Verificación externa: <span class="mono">openssl ts -verify -digest ${esc(c.seal.sha256)} -in sello.tsr -CAfile cacert.pem -untrusted tsa.crt</span> (certificados en freetsa.org).</p>`
+   <div class="row noprint" style="margin-top:8px">${c.seal.tsa && c.seal.tsa.tsr ? `<button class="ghost" onclick="dlSealTsr('${c.id}')">Descargar sello .tsr</button>` : ''}${!realTsa(c.seal.tsa) ? `<button class="ghost" onclick="restampSeal('${c.id}')">Reintentar sello</button>` : ''}<button class="ghost" onclick="reopen('${c.id}')">Nueva versión</button></div>
+   ${verifyHint(c.seal.sha256, c.seal.tsa)}`
     : `<p class="small mut">Congela el expediente: calcula el SHA-256 de todo su contenido y lo sella con hora oficial. Cualquier cambio posterior se detecta en “Verificar”.</p><button class="ok" onclick="sealCase('${c.id}')">Sellar expediente</button>`}</div>
   ${await oracleCards(c)}
   <div class="row noprint"><button class="bad" onclick="delCase('${c.id}')">Eliminar</button></div>`;
@@ -380,9 +434,14 @@ async function vExp(id) {
 async function stamp(hash) {
   try {
     const r = await fetch('/api/timestamp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sha256: hash }) });
-    const j = await r.json(); if (!r.ok) return { error: j.error || 'error' };
-    return { tsa: j.tsa, genTime: j.genTime, imprintPresent: j.imprintPresent, nonce: j.nonce, tsr: j.tsr, status: j.status };
+    const j = await r.json(); if (!r.ok) return { error: (j.error || 'error') + (j.tried ? ` (${j.tried.join(' · ')})` : '') };
+    return { tsa: j.tsa, tsaId: j.tsaId, genTime: j.genTime, imprintPresent: j.imprintPresent, nonce: j.nonce, tsr: j.tsr, status: j.status };
   } catch { return { error: 'sin conexión con la TSA' }; }
+}
+function realTsa(t) { return !!(t && t.genTime && !t.demo); }
+async function stampFor(c, hash) {
+  const t = await stamp(hash);
+  return t.error && c.demo ? { tsa: 'Sello simulado (DEMO)', tsaId: 'demo', demo: true, genTime: new Date().toISOString(), imprintPresent: false, tsr: null, reason: t.error } : t;
 }
 window.runAnalysis = async (id) => {
   const c = getCase(id); if (!c || c.seal) return;
@@ -395,7 +454,7 @@ window.runAnalysis = async (id) => {
     c.analysis = j; save();
     await audit('analisis_tecnico', c.id, `entrega=${j.deliveryHost || 'no detectada'} hash=${j.reportSha256}`);
     if (st) st.innerHTML = '<p><span class="spin"></span> Sellando informe técnico…</p>';
-    c.analysisTsa = await stamp(j.reportSha256); save();
+    c.analysisTsa = await stampFor(c, j.reportSha256); save();
     if (c.watermark) c.watermark = await checkWatermark(c, c.watermark.payload);
     save(); toast('Análisis completo');
   } catch (e) { toast('Falló el análisis: ' + e.message); }
@@ -418,19 +477,26 @@ window.addCaptures = async (id, files) => {
   const c = getCase(id); const st = $('#capStatus');
   for (const f of files) {
     st.innerHTML = `<p><span class="spin"></span> Calculando SHA-256 de ${esc(f.name)}…</p>`;
-    const hash = await sha256Hex(await f.arrayBuffer());
+    const hash = await sha256File(f, (k) => { st.innerHTML = `<p><span class="spin"></span> Calculando SHA-256 de ${esc(f.name)}… ${Math.round(k * 100)} %</p>`; });
     if (c.captures.some(x => x.sha256 === hash)) { toast('Captura repetida'); continue; }
     const cap = { name: f.name, size: f.size, type: f.type || 'desconocido', lastModified: new Date(f.lastModified).toISOString(), addedAt: new Date().toISOString(), sha256: hash, thumb: await thumbOf(f) };
     st.innerHTML = `<p><span class="spin"></span> Pidiendo sello de tiempo para ${esc(f.name)}…</p>`;
-    cap.tsa = await stamp(hash);
+    cap.tsa = await stampFor(c, hash);
     c.captures.push(cap); save();
     await audit('captura_agregada', id, `${f.name} sha256=${hash}`);
   }
   route();
 };
-window.restamp = async (id, i) => { const c = getCase(id); c.captures[i].tsa = await stamp(c.captures[i].sha256); save(); route(); };
-window.dlTsr = (id, i) => { const c = getCase(id), x = c.captures[i]; download(`${c.num}_${x.sha256.slice(0, 12)}.tsr`, b64ToBlob(x.tsa.tsr, 'application/timestamp-reply')); };
-window.dlSealTsr = (id) => { const c = getCase(id); download(`${c.num}_v${c.version}_sello.tsr`, b64ToBlob(c.seal.tsa.tsr, 'application/timestamp-reply')); };
+window.restampSeal = async (id) => {
+  const c = getCase(id); if (!c.seal) return;
+  toast('Pidiendo sello de tiempo…'); c.seal.tsa = await stampFor(c, c.seal.sha256); save();
+  if (realTsa(c.seal.tsa)) await audit('expediente_sellado', id, `v${c.version} sha256=${c.seal.sha256} (sello reintentado)`);
+  route();
+};
+window.restampReport = async (id) => { const c = getCase(id); c.analysisTsa = await stampFor(c, c.analysis.reportSha256); save(); route(); };
+window.restamp = async (id, i) => { const c = getCase(id); c.captures[i].tsa = await stampFor(c, c.captures[i].sha256); save(); route(); };
+window.dlTsr = (id, i) => { const c = getCase(id), x = c.captures[i]; if (!x.tsa || !x.tsa.tsr) return toast('Este sello no tiene .tsr (simulado o fallido)'); download(`${c.num}_${x.sha256.slice(0, 12)}.tsr`, b64ToBlob(x.tsa.tsr, 'application/timestamp-reply')); };
+window.dlSealTsr = (id) => { const c = getCase(id); if (!c.seal.tsa || !c.seal.tsa.tsr) return toast('Este sello no tiene .tsr (simulado o fallido)'); download(`${c.num}_v${c.version}_sello.tsr`, b64ToBlob(c.seal.tsa.tsr, 'application/timestamp-reply')); };
 function platformOf(u) {
   const h = hostOf(u);
   if (/(^|\.)(x|twitter)\.com$/.test(h)) return 'X';
@@ -444,7 +510,7 @@ window.addPromo = async (id) => {
   const c = getCase(id); const url = $('#pUrl').value.trim(); if (!hostOf(url)) return toast('URL inválida');
   const p = { platform: platformOf(url), url, account: $('#pAcc').value.trim(), reach: $('#pReach').value.trim(), addedAt: new Date().toISOString() };
   const f = $('#pFile').files[0];
-  if (f) { p.sha256 = await sha256Hex(await f.arrayBuffer()); p.file = f.name; p.tsa = await stamp(p.sha256); }
+  if (f) { p.sha256 = await sha256File(f); p.file = f.name; p.tsa = await stampFor(c, p.sha256); }
   c.promos.push(p); save(); await audit('promocion_agregada', id, `${p.platform} ${url}`); route();
 };
 window.doExpiry = async (id) => { const c = getCase(id); c.expiry = proposeExpiry(c); save(); await audit('vencimiento_propuesto', id, c.expiry.why); route(); };
@@ -455,7 +521,7 @@ window.sealCase = async (id) => {
   if (score(c).pct < 50 && !confirm('El expediente tiene solidez baja. ¿Sellar igual?')) return;
   const hash = await sha256Hex(stable(sealPayload(c)));
   toast('Sellando…');
-  c.seal = { sha256: hash, sealedAt: new Date().toISOString(), tsa: await stamp(hash) }; save();
+  c.seal = { sha256: hash, sealedAt: new Date().toISOString(), tsa: await stampFor(c, hash) }; save();
   await audit('expediente_sellado', id, `v${c.version} sha256=${hash}`); route();
 };
 window.reopen = async (id) => {
@@ -582,6 +648,43 @@ window.genMarks = async () => {
   save(); await audit('marcas_generadas', null, `${n} ${lic} ${mid}`); route();
 };
 
+/* --- Banco de pruebas de marcas (servidor de prueba: /api/mock-payloads + /api/verify-mark) --- */
+const HTTP_TXT = { 200: '200 OK', 400: '400 Bad Request', 403: '403 Forbidden', 422: '422 Unprocessable Entity' };
+const httpPill = (s) => `<span class="pill ${s === 200 ? 'ok' : s === 403 ? 'bad' : 'warn'}">${esc(HTTP_TXT[s] || String(s))}</span>`;
+let MOCK = null;
+async function vPruebas() {
+  return `${hero('Banco de pruebas', 'de marcas de agua contra un servidor de prueba.')}
+  <div class="card"><h2>Servidor de pruebas</h2><p class="small mut">Valida payloads contra una base de prueba ficticia, sin señales reales de ningún licenciatario. Responde <b>200</b> si el payload es válido y figura como emitido, <b>403</b> si la señal no está autorizada (licenciatario, partido o sesión fuera de la base), <b>422</b> si el dígito de control no coincide y <b>400</b> si el formato es inválido.</p>
+  <div class="row"><input id="tbIn" class="mono" placeholder="AR-XXXXXX-LIC-XXXXXXXX-XXXX" style="flex:1"><select id="tbM"><option value="">cualquier partido</option>${(MOCK ? MOCK.base.matches : []).map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('')}</select><button onclick="tbVerify()">Verificar</button></div><div id="tbOut"></div></div>
+  <div class="card"><h2>Payloads simulados</h2><p class="small mut">El emisor mock genera payloads con la estructura del detector forense (payload, partido y metadatos del detector) y el código que el servidor debería devolver.</p>
+  <div class="row"><button class="ghost" onclick="tbMock()">Generar payloads simulados</button>${MOCK ? '<button onclick="tbRunAll()">Verificar todos</button>' : ''}</div><div id="tbSum"></div>
+  ${MOCK ? `<div class="tbl"><table><tr><th>Tipo</th><th>Payload</th><th>Esperado</th><th>Obtenido</th><th></th></tr>${MOCK.payloads.map((p, i) => `<tr><td>${esc(p.kind)}</td><td class="mono small">${esc(p.payload)}<div class="mut">${esc(p.matchId)} · confianza ${p.detector.confidence}</div></td><td>${httpPill(p.expected)}</td><td id="tbG${i}">${p.got ? httpPill(p.got) : '—'}</td><td id="tbR${i}">${p.got ? (p.got === p.expected ? '<i class="ck y"></i>' : '<i class="ck n"></i>') : ''}</td></tr>`).join('')}</table></div>` : ''}</div>
+  ${MOCK ? `<div class="card"><h2>Base de prueba: marcas emitidas</h2><div class="tbl"><table><tr><th>Payload</th><th>Partido</th><th>Sesión</th></tr>${MOCK.base.marks.map(k => `<tr><td class="mono small">${esc(k.payload)}</td><td>${esc(k.matchId)}</td><td>${esc(k.session)} · ${esc(k.note)}</td></tr>`).join('')}</table></div></div>` : ''}`;
+}
+async function verifyMarkApi(payload, matchId) {
+  const r = await fetch('/api/verify-mark', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload, matchId: matchId || undefined }) });
+  return { status: r.status, j: await r.json().catch(() => ({})) };
+}
+window.tbVerify = async () => {
+  const out = $('#tbOut'); out.innerHTML = '<p><span class="spin"></span> Consultando el servidor de pruebas…</p>';
+  try {
+    const { status, j } = await verifyMarkApi($('#tbIn').value, $('#tbM').value);
+    out.innerHTML = `<p>${httpPill(status)} <span class="small mut">${esc(j.code || j.error || '')}</span></p><ul class="check small">${(j.checks || []).map(x => `<li><i class="ck ${x.ok ? 'y' : 'n'}"></i> ${esc(x.t)}</li>`).join('')}</ul>`;
+  } catch { out.innerHTML = '<div class="verdict bad">Sin conexión con el servidor de pruebas</div>'; }
+};
+window.tbMock = async () => {
+  try { const r = await fetch('/api/mock-payloads?n=14'); if (!r.ok) throw 0; MOCK = await r.json(); route(); } catch { toast('No respondió /api/mock-payloads'); }
+};
+window.tbRunAll = async () => {
+  let ok = 0;
+  for (const [i, p] of MOCK.payloads.entries()) {
+    try { p.got = (await verifyMarkApi(p.payload, p.matchId)).status; } catch { p.got = 0; }
+    if (p.got === p.expected) ok++;
+    $('#tbG' + i).innerHTML = httpPill(p.got); $('#tbR' + i).innerHTML = `<i class="ck ${p.got === p.expected ? 'y' : 'n'}"></i>`;
+  }
+  $('#tbSum').innerHTML = `<div class="verdict ${ok === MOCK.payloads.length ? 'ok' : 'bad'}">${ok}/${MOCK.payloads.length} respuestas con el código esperado</div>`;
+};
+
 /* --- Verificar --- */
 async function vVerificar() {
   return `${hero('Verificar', 'que ninguna captura ni expediente fue alterado.')}
@@ -591,7 +694,7 @@ async function vVerificar() {
 }
 window.verifyFile = async (f) => {
   if (!f) return; $('#vf').innerHTML = '<p><span class="spin"></span> Calculando…</p>';
-  const h = await sha256Hex(await f.arrayBuffer());
+  const h = await sha256File(f);
   const hits = []; for (const c of DB.cases) { c.captures.forEach(x => x.sha256 === h && hits.push([c, x])); c.promos.forEach(x => x.sha256 === h && hits.push([c, x])); }
   $('#vf').innerHTML = `<div class="mono">${h}</div>` + (hits.length ? hits.map(([c, x]) => `<div class="verdict ok">✔ Coincide con ${esc(c.num)} · ${esc(x.name || x.file)} · sellado ${fmt(x.tsa && x.tsa.genTime)}</div>`).join('') : '<div class="verdict bad">✖ No coincide con ninguna captura registrada (o el archivo fue modificado).</div>');
 };
@@ -604,7 +707,7 @@ window.verifyJson = async (f) => {
   if (!f) return; try {
     const j = JSON.parse(await f.text()); const c = j.case; const r = await checkCase(c);
     const au = j.audit && j.audit.length ? '' : '';
-    $('#vj').innerHTML = `<div class="verdict ${r.ok ? 'ok' : r.ok === false ? 'bad' : 'warn'}">${esc(c.num)}: ${esc(r.t)}</div>${c.seal && c.seal.tsa ? `<p class="small">Sello TSA: ${esc(c.seal.tsa.genTime)} · imprint ${c.seal.tsa.imprintPresent ? 'presente' : '—'}</p>` : ''}${au}`;
+    $('#vj').innerHTML = `<div class="verdict ${r.ok ? 'ok' : r.ok === false ? 'bad' : 'warn'}">${esc(c.num)}: ${esc(r.t)}</div>${c.seal && c.seal.tsa ? `<p class="small">Sello TSA: ${esc(c.seal.tsa.genTime)} · imprint ${c.seal.tsa.imprintPresent ? 'presente' : '—'}${c.seal.tsa.demo ? ' · <b>SIMULADO (DEMO), sin valor probatorio</b>' : ''}</p>` : ''}${au}`;
   } catch { $('#vj').innerHTML = '<div class="verdict bad">JSON inválido</div>'; }
 };
 window.verifyLocal = async () => { let h = ''; for (const c of DB.cases) { const r = await checkCase(c); h += `<div class="verdict ${r.ok ? 'ok' : r.ok === false ? 'bad' : 'warn'} small">${esc(c.num)}: ${esc(r.t)}</div>`; } $('#vl').innerHTML = h || '<p class="mut">Sin expedientes</p>'; };

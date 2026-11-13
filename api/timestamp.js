@@ -28,22 +28,59 @@ function genTime(buf) {
   return null;
 }
 
+const TSAS = [
+  { id: 'freetsa', name: 'FreeTSA (freetsa.org)', url: 'https://freetsa.org/tsr', ms: 8000 },
+  { id: 'sectigo', name: 'Sectigo', url: 'https://timestamp.sectigo.com', ms: 10000 },
+];
+
+function derAt(buf, i) {
+  let n = buf[i + 1], off = i + 2;
+  if (n & 0x80) { const k = n & 0x7f; n = 0; for (let j = 0; j < k; j++) n = n * 256 + buf[off + j]; off += k; }
+  return { tag: buf[i], start: off, end: off + n };
+}
+
+// TimeStampResp ::= SEQUENCE { status PKIStatusInfo ::= SEQUENCE { status INTEGER, ... }, timeStampToken OPTIONAL }
+function pkiStatus(buf) {
+  try {
+    const resp = derAt(buf, 0); if (resp.tag !== 0x30) return null;
+    const info = derAt(buf, resp.start); if (info.tag !== 0x30) return null;
+    const st = derAt(buf, info.start); if (st.tag !== 0x02) return null;
+    return buf[st.end - 1];
+  } catch { return null; }
+}
+
+async function ask(tsa, der) {
+  const r = await L.fetchT(tsa.url, { method: 'POST', headers: { 'Content-Type': 'application/timestamp-query' }, body: der }, tsa.ms);
+  const tsr = Buffer.from(await r.arrayBuffer());
+  if (!r.ok || tsr.length < 100) throw new Error(`HTTP ${r.status}`);
+  const code = pkiStatus(tsr);
+  if (code !== 0 && code !== 1) throw new Error(`PKIStatus ${code}`);
+  return tsr;
+}
+
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return L.send(res, 204, {});
   try {
     const body = await L.readBody(req);
     const hash = String(body.sha256 || '').toLowerCase();
     if (!/^[0-9a-f]{64}$/.test(hash)) return L.send(res, 400, { error: 'sha256 inválido' });
-    const { der, nonce } = buildReq(hash);
-    const r = await L.fetchT('https://freetsa.org/tsr', { method: 'POST', headers: { 'Content-Type': 'application/timestamp-query' }, body: der }, 12000);
-    const tsr = Buffer.from(await r.arrayBuffer());
-    if (!r.ok || tsr.length < 100) return L.send(res, 502, { error: 'La TSA no respondió', status: r.status });
-    const status = tsr[0] === 0x30 ? tsr.indexOf(Buffer.from([0x02, 0x01, 0x00])) >= 0 && tsr.indexOf(Buffer.from([0x02, 0x01, 0x00])) < 12 ? 'granted' : 'revisar' : 'error';
-    return L.send(res, 200, {
-      tsa: 'FreeTSA (freetsa.org) — RFC 3161', sha256: hash, nonce, status,
-      genTime: genTime(tsr), imprintPresent: tsr.indexOf(Buffer.from(hash, 'hex')) >= 0,
-      tsr: tsr.toString('base64'), tsq: der.toString('base64'), serverTime: new Date().toISOString(),
-    });
+    const tried = [];
+    for (const tsa of TSAS) {
+      const { der, nonce } = buildReq(hash);
+      try {
+        const tsr = await ask(tsa, der);
+        const g = genTime(tsr), imprintPresent = tsr.indexOf(Buffer.from(hash, 'hex')) >= 0;
+        if (!g || !imprintPresent) throw new Error('sello sin hora o sin el hash');
+        return L.send(res, 200, {
+          tsa: `${tsa.name} — RFC 3161`, tsaId: tsa.id, tsaUrl: tsa.url, sha256: hash, nonce, status: 'granted',
+          genTime: g, imprintPresent, nonceOk: tsr.indexOf(Buffer.from(nonce, 'hex')) >= 0, tried,
+          tsr: tsr.toString('base64'), tsq: der.toString('base64'), serverTime: new Date().toISOString(),
+        });
+      } catch (e) {
+        tried.push(`${tsa.id}: ${String(e && e.name === 'AbortError' ? 'sin respuesta' : e && e.message || e).slice(0, 80)}`);
+      }
+    }
+    return L.send(res, 502, { error: 'Ninguna TSA respondió', tried });
   } catch (e) {
     return L.send(res, 500, { error: 'Fallo el sellado', detail: String(e && e.message || e).slice(0, 200) });
   }

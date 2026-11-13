@@ -153,7 +153,7 @@ window.runOracle = async (id) => {
     if (c.consensus.ok) {
       say('Consenso alcanzado: congelando el expediente…');
       const hash = await sha256Hex(stable(sealPayload(c)));
-      c.seal = { sha256: hash, sealedAt: new Date().toISOString(), tsa: await stamp(hash) };
+      c.seal = { sha256: hash, sealedAt: new Date().toISOString(), tsa: await stampFor(c, hash) };
       c.estado = 'en_cola_juez'; save();
       await audit('expediente_sellado', c.id, `v${c.version} sha256=${hash}`);
       await audit('consenso_ok', c.id, `en cola del juez de turno · ${c.jurisdiccion}`);
