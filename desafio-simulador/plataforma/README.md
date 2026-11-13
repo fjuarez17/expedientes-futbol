@@ -21,6 +21,11 @@ Usuarios de demostración (ficticios):
 
 Para el partido final, apuntar `--simulador` a la IP asignada.
 
+**Firma del juez en su dispositivo.** Al entrar, el navegador del juez genera un par de claves con WebCrypto (Ed25519, o ECDSA P-256 si no hay Ed25519). La privada no es exportable y queda en el celular; el servidor recibe solo la pública (`clave_registrada` en la auditoría). Cada decisión, reenvío o reclamo se firma en el celular sobre un texto que incluye el hash del expediente, y el servidor la verifica antes de mandar nada a los proveedores. WebCrypto exige contexto seguro: en la misma compu alcanza con `localhost`; **desde celulares en la red local, correr la plataforma con `--https`** (certificado autofirmado: aceptar el aviso una vez). Plan B si un celular no puede firmar: `--sin-firma-dispositivo` (queda registrado en `plataforma_iniciada`). Verificación posterior:
+```bash
+python plataforma/servidor.py --verificar-firmas entrega/plataforma.json
+```
+
 ## Con Supabase (la app del equipo hace de interfaz del juez)
 
 El motor sigue hablando con el simulador, pero publica todo en el Supabase de la app web. El juez firma desde
