@@ -842,7 +842,7 @@ class Manejador(BaseHTTPRequestHandler):
 
 def main() -> None:
     a = argparse.ArgumentParser(description="Plataforma de órdenes de bloqueo en vivo")
-    a.add_argument("--simulador", default="http://localhost:8080")
+    a.add_argument("--simulador", default="https://3-150-111-38.sslip.io/t/1kbfvdb8")
     a.add_argument("--puerto", type=int, default=8090)
     a.add_argument("--salida", type=Path, default=REPO_DIR / "entrega")
     a.add_argument("--usuarios", type=Path, default=DIR / "usuarios_demo.json")
