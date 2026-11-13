@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><title>Reproductor ESPN Premium (prueba)</title><meta name="robots" content="noindex">
+<style>html,body{margin:0;height:100%;background:#000}video{width:100%;height:100%}</style>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+</head>
+<body>
+<video id="v" controls muted autoplay playsinline></video>
+<script>
+var player = { source: "https://demo.unified-streaming.com/k8s/live/stable/live.isml/.m3u8" };
+var v = document.getElementById('v');
+if (window.Hls && Hls.isSupported()) { var h = new Hls(); h.loadSource(player.source); h.attachMedia(v); }
+else v.src = player.source;
+</script>
+</body>
+</html>

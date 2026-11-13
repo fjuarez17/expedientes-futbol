@@ -1,4 +1,5 @@
 const L = require('./_lib');
+const F = require('./_futbol');
 
 const VIDEO_RE = /https?:\\?\/\\?\/[^"'\s<>()]+?\.(?:m3u8|mpd|mp4|flv|ts)(?:\?[^"'\s<>()]*)?/gi;
 const IFRAME_RE = /<(?:iframe|embed)[^>]+?(?:src|data-src)\s*=\s*["']([^"']+)["']/gi;
@@ -72,7 +73,7 @@ async function crawl(url, referer, depth, seen, nodes) {
   nodes.push(node);
   if (g.text) {
     const ex = extract(g.text, g.finalUrl || url);
-    node.title = ex.title; node.iframes = ex.iframes; node.videos = ex.videos;
+    node.title = ex.title; node.iframes = ex.iframes; node.videos = ex.videos; node.signals = F.footballSignals(g.text);
     if (depth < 2) await Promise.all(ex.iframes.slice(0, 3).map(f => crawl(f, g.finalUrl || url, depth + 1, seen, nodes)));
   }
 }
@@ -168,10 +169,12 @@ module.exports = async (req, res) => {
     const rdapTargets = [...new Set([pageDomain, deliveryHost && deliveryHost.host].filter(Boolean))];
     const rdap = await Promise.all(rdapTargets.map(L.rdapDomain));
 
+    const signals = F.mergeSignals(nodes.map(n => n.signals)); nodes.forEach(n => delete n.signals);
     const report = {
       target, startedAt, finishedAt: new Date().toISOString(), analyzer: 'expedientes-futbol/1.0 (Vercel)',
       chain: nodes, video: probes, hosts, rdap,
       deliveryHost: deliveryHost ? deliveryHost.host : null,
+      signals,
       notes: deliveryHost ? [] : ['No se detectó automáticamente el servidor de video (puede cargarse por JavaScript ofuscado o requerir sesión). Pegá la URL .m3u8 desde las herramientas de red del navegador en "URL del video".'],
     };
     report.reportSha256 = L.sha256(JSON.stringify(report));
