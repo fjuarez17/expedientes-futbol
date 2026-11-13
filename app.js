@@ -312,11 +312,13 @@ async function vNuevo(_, qs) {
   <label>URL de la página pirata (donde se ve el reproductor)</label><input id="nUrl" placeholder="https://sitio-pirata.xyz/canal/tnt" inputmode="url">
   <label>URL del video (.m3u8) — opcional, si la tenés de las herramientas de red</label><input id="nVid" placeholder="https://cdn.ejemplo/live/index.m3u8" inputmode="url">
   <label>Detectado por / notas</label><input id="nNote" placeholder="Monitoreo, denuncia de usuario, etc.">
-  <div class="row" style="margin-top:12px"><button onclick="createCase(true)">Crear y analizar</button><button class="ghost" onclick="createCase(false)">Solo crear</button></div>
+  <label class="small" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="nSeal" style="width:auto"> Sellar el expediente al terminar (después ya no se puede agregar la marca de agua ni promociones sin abrir una versión nueva)</label>
+  <p class="small mut">“Crear y verificar” sigue la página hasta el reproductor y el .m3u8, comprueba que sea un streaming de fútbol (reproductor, partido, canal, dominio no autorizado) y que esté en vivo, baja segmentos del stream y saca un fotograma para el detector de marca de agua. Cada pieza queda con SHA-256 y sello RFC 3161, junto con el HTML de la página. Para probarlo: <a href="#/nuevo" onclick="$('#nUrl').value=location.origin+'/prueba/en-vivo.html';return false">usar la página de prueba</a>.</p>
+  <div class="row" style="margin-top:12px"><button onclick="createCase(true)">Crear y verificar</button><button class="ghost" onclick="createCase(false)">Solo crear</button></div>
   </div>`;
 }
 window.createCase = async (run) => {
-  const m = matchById($('#nMatch').value); const url = $('#nUrl').value.trim();
+  const m = matchById($('#nMatch').value); const url = $('#nUrl').value.trim(); const sealAfter = !!($('#nSeal') && $('#nSeal').checked);
   if (!m) return toast('Elegí un partido'); if (!hostOf(url)) return toast('URL inválida');
   DB.seq++;
   const c = { id: uid(), num: `EXP-${new Date().getFullYear()}-${String(DB.seq).padStart(4, '0')}`, createdAt: new Date().toISOString(), version: 1,
@@ -325,7 +327,7 @@ window.createCase = async (run) => {
     analysis: null, analysisTsa: null, watermark: null, captures: [], promos: [], expiry: null, seal: null };
   DB.cases.push(c); save(); await audit('expediente_creado', c.id, `${c.num} ${c.target}`);
   location.hash = '#/exp/' + c.id;
-  if (run) setTimeout(() => runAnalysis(c.id), 300);
+  if (run) setTimeout(() => autoVerify(c.id, sealAfter), 300);
 };
 
 async function vExpedientes(_, qs) {
@@ -384,6 +386,7 @@ async function vExp(id) {
   <ul class="check small">${s.items.map(([t, w, ok]) => `<li>${ok ? '<i class="ck y"></i>' : '<i class="ck"></i>'} ${esc(t)} <span class="mut">(${w})</span></li>`).join('')}</ul>
   ${rein.length ? `<div class="verdict warn">⚠ Reincidencia detectada: ${rein.map(r => `${esc(r.type)} ${esc(r.key)} en ${r.n} exp.`).join(' · ')}</div>` : ''}</div>
 
+  ${streamCard(c, ro)}
   <div class="card step ${wm ? (wm.verdict === 'ok' ? 'done' : 'bad') : ''}"><div class="fig">PASO 1.0</div><h2>Prueba de señal oficial (marca de agua)</h2>
   <p class="small mut">Pegá el payload que devolvió el detector forense al analizar la captura del stream. La plataforma verifica que corresponde a este partido y a qué licenciatario se emitió, y que el sitio no es un dominio propio de ese licenciatario.</p>
   ${ro ? '' : `<div class="row"><input id="wmIn" class="mono" placeholder="AR-XXXXXX-LIC-XXXXXXXX-XXXX" value="${esc(wm ? wm.payload : '')}" style="flex:1"><button onclick="doWatermark('${c.id}')">Verificar</button></div>`}
@@ -406,12 +409,12 @@ async function vExp(id) {
 
   <div class="card step ${c.captures.length ? (c.captures.every(x => realTsa(x.tsa)) ? 'done' : 'warn') : ''}"><div class="fig">PASO 4.0</div><h2>Capturas: hashes y sellos de tiempo</h2>
   <p class="small mut">El archivo no sale de tu teléfono: el SHA-256 se calcula localmente y solo el hash viaja a la autoridad de sellado (RFC 3161: FreeTSA y, si no responde, Sectigo). Guardá el archivo original: cualquier alteración cambia el hash.</p>
-  ${ro ? '' : `<label class="btn">+ Agregar capturas (foto/video)<input type="file" multiple accept="image/*,video/*" hidden onchange="addCaptures('${c.id}',this.files)"></label>`}
+  ${ro ? '' : `<button onclick="autoCaptureBtn('${c.id}')">Capturar la página automáticamente</button> <label class="btn">+ Agregar capturas (foto/video)<input type="file" multiple accept="image/*,video/*" hidden onchange="addCaptures('${c.id}',this.files)"></label>`}
   <div id="capStatus"></div>
   <div class="thumbs" style="margin:8px 0">${c.captures.filter(x => x.thumb).map(x => `<img src="${x.thumb}" alt="">`).join('')}</div>
   ${c.captures.map((x, i) => `<div class="card" style="background:var(--card2)"><div class="row sp"><b>${esc(x.name)}</b><span class="small mut">${(x.size / 1024).toFixed(0)} KB · ${esc(x.type)}</span></div>
-   <div class="mono">SHA-256 ${esc(x.sha256)}</div><div class="small mut">Registrada ${fmt(x.addedAt)}</div>${tsaBox(x.tsa)}
-   <div class="row noprint" style="margin-top:6px">${x.tsa && x.tsa.tsr ? `<button class="ghost" onclick="dlTsr('${c.id}',${i})">Descargar sello .tsr</button>` : ''}${!ro && !realTsa(x.tsa) ? `<button class="ghost" onclick="restamp('${c.id}',${i})">Reintentar sello</button>` : ''}</div></div>`).join('')}</div>
+   <div class="mono">SHA-256 ${esc(x.sha256)}</div><div class="small mut">Registrada ${fmt(x.addedAt)}</div>${x.thumb && x.kind === 'fotograma' ? `<img src="${x.thumb}" alt="" style="max-width:220px;border-radius:6px;margin:6px 0">` : ''}${x.kind === 'fotograma' && x.source ? `<div class="small mut">Fotograma ${esc(x.source.width)}×${esc(x.source.height)} del segmento ${esc(x.source.seq)} (SHA-256 ${esc((x.source.fromSegmentSha256 || '').slice(0, 16))}…), sacado en el navegador</div>` : ''}${x.source && x.source.finalUrl ? `<div class="small mut">Descargada de ${esc(x.source.finalUrl)} · HTTP ${esc(x.source.httpStatus)}${x.kind === 'segmento' ? ` · segmento ${esc(x.source.seq)}${x.source.live ? ' · en vivo' : ''}${x.source.programDateTime ? ' · hora en el stream ' + esc(x.source.programDateTime) : ''}` : ''}${x.source.title ? ' · “' + esc(x.source.title) + '”' : ''}${x.source.hops && x.source.hops.length ? ` · ${x.source.hops.length} redirección(es)` : ''}${x.source.truncated ? ' · truncada a 2 MB' : ''}</div>` : ''}${tsaBox(x.tsa)}
+   <div class="row noprint" style="margin-top:6px">${x.data64 || x.html64 ? `<button class="ghost" onclick="dlData('${c.id}',${i})">Descargar ${x.kind === 'segmento' ? 'segmento' : x.kind === 'fotograma' ? 'fotograma' : 'HTML'} capturado</button>` : ''}${x.tsa && x.tsa.tsr ? `<button class="ghost" onclick="dlTsr('${c.id}',${i})">Descargar sello .tsr</button>` : ''}${!ro && !realTsa(x.tsa) ? `<button class="ghost" onclick="restamp('${c.id}',${i})">Reintentar sello</button>` : ''}</div></div>`).join('')}</div>
 
   <div class="card step ${c.promos.length ? 'done' : ''}"><div class="fig">PASO 5.0</div><h2>Dónde se promocionó el enlace</h2>
   ${ro ? '' : `<div class="grid"><div><label>URL del posteo/mensaje</label><input id="pUrl" placeholder="https://x.com/... · t.me/... · discord.com/..."></div><div><label>Cuenta / canal</label><input id="pAcc" placeholder="@usuario o nombre del canal"></div><div><label>Alcance (seguidores/miembros)</label><input id="pReach" inputmode="numeric"></div></div><label>Captura del posteo (opcional, se hashea)</label><input id="pFile" type="file" accept="image/*"><div class="row" style="margin-top:8px"><button onclick="addPromo('${c.id}')">Agregar</button></div>`}
@@ -459,6 +462,188 @@ window.runAnalysis = async (id) => {
     save(); toast('Análisis completo');
   } catch (e) { toast('Falló el análisis: ' + e.message); }
   route();
+};
+function b64ToBytes(b64) { const s = atob(b64); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+window.autoCapture = async (id) => {
+  const c = getCase(id); if (!c || c.seal) return false;
+  const st = $('#capStatus'); const say = (t) => { if (st) st.innerHTML = `<p><span class="spin"></span> ${t}</p>`; };
+  say(`Descargando ${esc(hostOf(c.target))} tal como la entrega el servidor…`);
+  try {
+    const r = await fetch('/api/capture?url=' + encodeURIComponent(c.target)); const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+    const bytes = b64ToBytes(j.b64); const hash = await sha256Hex(bytes);
+    if (hash !== j.sha256) throw new Error('el hash recalculado no coincide con el del servidor');
+    if (c.captures.some(x => x.sha256 === hash)) { toast('La página no cambió desde la última captura'); return true; }
+    const host = hostOf(j.finalUrl) || 'pagina';
+    const cap = { name: `pagina_${host}_${j.fetchedAt.replace(/[:.]/g, '-')}.html`, size: j.bytes, type: (j.contentType || 'text/html') + ' · captura automática', auto: true, lastModified: j.fetchedAt, addedAt: new Date().toISOString(), sha256: hash, thumb: null,
+      source: { url: c.target, finalUrl: j.finalUrl, httpStatus: j.status, hops: j.hops, headers: j.headers, title: j.title, fetchedAt: j.fetchedAt, truncated: j.truncated, capturer: j.capturer } };
+    if (j.bytes <= 300000) cap.data64 = j.b64;
+    say('Pidiendo sello de tiempo RFC 3161 para la captura…');
+    cap.tsa = await stampFor(c, hash);
+    c.captures.push(cap);
+    saveCapped(cap);
+    await audit('captura_agregada', id, `${cap.name} (automática, HTTP ${j.status}) sha256=${hash}`);
+    return true;
+  } catch (e) { toast('No se pudo capturar la página: ' + e.message); return false; }
+};
+window.autoCaptureBtn = async (id) => { await autoCapture(id); route(); };
+window.autoVerify = async (id, sealAfter) => {
+  await runAnalysis(id);
+  const c = getCase(id); if (!c || c.seal) return;
+  if (manifestOf(c)) await streamCapture(id);
+  await autoCapture(id);
+  if (!c.expiry) { c.expiry = proposeExpiry(c); save(); await audit('vencimiento_propuesto', id, c.expiry.why); }
+  if (sealAfter) await sealNow(c);
+  route(); toast(`Verificación automática terminada: solidez ${score(c).pct}%`);
+};
+window.dlData = (id, i) => { const c = getCase(id), x = c.captures[i]; const b = x.data64 || x.html64; if (!b) return toast('El archivo era muy grande para guardarlo en el dispositivo; quedó registrado su hash'); download(x.name, new Blob([b64ToBytes(b)], { type: (x.type || '').split(' ')[0] || 'application/octet-stream' })); };
+function saveCapped(cap) { try { save(); } catch { delete cap.data64; try { save(); } catch { toast('El almacenamiento del navegador está lleno'); } } }
+function bytesToB64(u) { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
+
+/* ===== Verificación del stream de fútbol ===== */
+let muxLoading = null;
+function loadMux() {
+  if (window.muxjs) return Promise.resolve();
+  return muxLoading || (muxLoading = new Promise((ok, ko) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/mux.js@7.0.3/dist/mux.min.js'; s.onload = ok; s.onerror = () => { muxLoading = null; ko(new Error('no cargó mux.js')); }; document.head.appendChild(s); }));
+}
+// Saca un fotograma real de un segmento MPEG-TS: lo pasa a MP4 fragmentado (mux.js) y lo dibuja en un canvas.
+async function frameFromTs(bytes) {
+  await loadMux();
+  const tm = new muxjs.mp4.Transmuxer({ remux: true }); const parts = []; let init = null;
+  tm.on('data', s => { if (!init) init = s.initSegment; parts.push(s.data); });
+  tm.push(bytes); tm.flush();
+  if (!init) throw new Error('el segmento no tiene video decodificable');
+  const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.src = URL.createObjectURL(new Blob([init, ...parts], { type: 'video/mp4' }));
+  try {
+    await new Promise((ok, ko) => { v.onloadeddata = ok; v.onerror = () => ko(new Error('el navegador no pudo decodificar el video')); setTimeout(() => ko(new Error('tiempo agotado al decodificar')), 10000); });
+    v.currentTime = Math.min(1, (v.duration || 0) / 2);
+    await new Promise(ok => { v.onseeked = ok; setTimeout(ok, 3000); });
+    const cv = document.createElement('canvas'); cv.width = v.videoWidth; cv.height = v.videoHeight; cv.getContext('2d').drawImage(v, 0, 0);
+    const blob = await new Promise(ok => cv.toBlob(ok, 'image/png'));
+    return { blob, width: v.videoWidth, height: v.videoHeight, at: v.currentTime };
+  } finally { URL.revokeObjectURL(v.src); }
+}
+function manifestOf(c) {
+  const p = c.analysis && (c.analysis.video || []).find(x => x.type && x.type.startsWith('HLS'));
+  if (p) return { url: p.url, ref: p.referer || c.target };
+  if (c.videoUrl && /\.m3u8/i.test(c.videoUrl)) return { url: c.videoUrl, ref: c.target };
+  return null;
+}
+window.streamCapture = async (id) => {
+  const c = getCase(id); if (!c || c.seal) return false;
+  const mf = manifestOf(c);
+  if (!mf) { toast('No hay manifiesto .m3u8: corré el análisis o pegá la URL del video'); return false; }
+  const st = $('#strStatus'); const say = (t) => { if (st) st.innerHTML = `<p><span class="spin"></span> ${t}</p>`; else toast(t); };
+  say('Leyendo el manifiesto y comprobando que el stream esté en vivo…');
+  try {
+    const r = await fetch(`/api/stream-capture?url=${encodeURIComponent(mf.url)}&ref=${encodeURIComponent(mf.ref)}`); const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+    const sample = j.sample && b64ToBytes(j.sample.b64);
+    if (sample && await sha256Hex(sample) !== j.sample.sha256) throw new Error('el hash recalculado del segmento no coincide con el del servidor');
+    c.stream = { manifest: j.manifest, referer: j.referer, variant: j.variant, mediaPlaylist: j.mediaPlaylist, mediaPlaylistSha256: j.mediaPlaylistSha256, live: j.live, encrypted: j.encrypted, fmp4: j.fmp4, capturedAt: j.finishedAt, segments: j.segments.map(s => ({ seq: s.seq, sha256: s.sha256 || null, bytes: s.bytes || 0, status: s.status || null, error: s.error || null })), frame: null, frameError: null };
+    let n = 0;
+    for (const s of j.segments.filter(s => s.sha256 && s.status < 400)) {
+      if (c.captures.some(x => x.sha256 === s.sha256)) continue;
+      say(`Sellando el segmento ${esc(s.seq)} (RFC 3161)…`);
+      const cap = { name: `segmento_${hostOf(s.url)}_${s.seq}.ts`, size: s.bytes, type: (s.contentType || 'video/MP2T') + ' · segmento del stream', auto: true, kind: 'segmento', lastModified: s.fetchedAt, addedAt: new Date().toISOString(), sha256: s.sha256, thumb: null,
+        source: { url: s.url, finalUrl: s.finalUrl, httpStatus: s.status, fetchedAt: s.fetchedAt, seq: s.seq, duration: s.duration, programDateTime: s.programDateTime, server: s.server, truncated: s.truncated, manifest: j.mediaPlaylist, live: j.live.isLive, capturer: j.capturer } };
+      if (j.sample && j.sample.sha256 === s.sha256 && s.bytes <= 300000) cap.data64 = j.sample.b64;
+      cap.tsa = await stampFor(c, s.sha256); c.captures.push(cap); saveCapped(cap); n++;
+      await audit('captura_agregada', id, `${cap.name} (segmento del stream, ${j.live.isLive ? 'en vivo' : 'no en vivo'}) sha256=${s.sha256}`);
+    }
+    if (sample && !j.encrypted && !j.fmp4) {
+      say('Sacando un fotograma del partido para el detector de marca de agua…');
+      try {
+        const f = await frameFromTs(sample);
+        const bytes = new Uint8Array(await f.blob.arrayBuffer()); const hash = await sha256Hex(bytes);
+        const file = new File([f.blob], `fotograma_${j.sample.seq}.png`, { type: 'image/png' });
+        const cap = { name: file.name, size: bytes.length, type: 'image/png · fotograma del stream', auto: true, kind: 'fotograma', lastModified: j.finishedAt, addedAt: new Date().toISOString(), sha256: hash, thumb: await thumbOf(file),
+          source: { fromSegmentSha256: j.sample.sha256, seq: j.sample.seq, width: f.width, height: f.height, offsetS: f.at, manifest: j.mediaPlaylist, capturer: 'navegador (mux.js + canvas)' } };
+        if (bytes.length <= 400000) cap.data64 = bytesToB64(bytes);
+        say('Sellando el fotograma (RFC 3161)…');
+        cap.tsa = await stampFor(c, hash); c.captures.push(cap); saveCapped(cap); n++;
+        c.stream.frame = { sha256: hash, width: f.width, height: f.height };
+        await audit('captura_agregada', id, `${cap.name} (fotograma del segmento ${j.sample.seq}) sha256=${hash}`);
+      } catch (e) { c.stream.frameError = e.message; }
+    } else c.stream.frameError = j.encrypted ? `segmentos cifrados (${j.encrypted})` : j.fmp4 ? 'segmentos fMP4 (sin soporte todavía)' : 'segmento demasiado grande para descargarlo al navegador';
+    save(); await audit('stream_capturado', id, `${j.mediaPlaylist} vivo=${j.live.isLive} segmentos=${j.segments.length} capturas=${n}`);
+    return true;
+  } catch (e) { toast('No se pudo capturar el stream: ' + e.message); return false; }
+};
+window.streamCaptureBtn = async (id) => { await streamCapture(id); route(); };
+
+const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ');
+const GENERIC = new Set(['club', 'atletico', 'deportivo', 'central', 'union', 'independiente', 'estudiantes', 'gimnasia', 'san', 'de', 'cd', 'ca', 'el']);
+function teamAliases(name) {
+  const n = norm(name).replace(/\s+/g, ' ').trim(); const w = n.split(' '); const out = new Set([n]);
+  if (w[0] && !GENERIC.has(w[0]) && w[0].length >= 4) out.add(w[0]);
+  if (/newell/.test(n)) out.add('newells');
+  if (/^(gimnasia|estudiantes)/.test(n) && /la plata/.test(n)) out.add(w[0] + ' lp');
+  return [...out];
+}
+function teamIn(text, name) { return teamAliases(name).some(a => new RegExp('(^| )' + a.replace(/ /g, ' +') + '( |$)').test(text)); }
+function detectMatch(c) {
+  const s = c.analysis && c.analysis.signals; if (!s) return null;
+  const text = ' ' + norm(s.title + ' ' + s.text).replace(/\s+/g, ' ') + ' ';
+  const mine = { home: teamIn(text, c.match.home), away: teamIn(text, c.match.away) };
+  const now = new Date(c.analysis.startedAt || Date.now()).getTime();
+  const other = allMatches().filter(m => m.id !== c.match.id && teamIn(text, m.home) && teamIn(text, m.away))
+    .sort((a, b) => Math.abs(new Date(a.kickoff) - now) - Math.abs(new Date(b.kickoff) - now))[0] || null;
+  return { mine, other };
+}
+function authorizedHost(h) { for (const l of DB.licensees) for (const d of l.domains) if (h === d || h.endsWith('.' + d)) return l; return null; }
+function streamChecks(c) {
+  const a = c.analysis, s = a && a.signals, st = c.stream; const out = [];
+  const add = (ok, t, d) => out.push({ ok, t, d });
+  if (!a) return out;
+  const players = (s && s.players) || [];
+  add(players.length || manifestOf(c) ? true : false, 'Reproductor de video en la página', players.length ? players.join(', ') + (manifestOf(c) ? ' · manifiesto HLS encontrado' : '') : manifestOf(c) ? 'manifiesto HLS encontrado' : 'no se encontró reproductor ni stream');
+  const kw = (s && s.keywords) || []; const dm = detectMatch(c);
+  add(kw.some(k => k !== 'en vivo') || (dm && (dm.mine.home || dm.mine.away)) ? true : false, 'Contenido de fútbol', kw.length ? kw.join(', ') : 'la página no menciona fútbol, partidos ni ligas');
+  if (dm) {
+    if (dm.mine.home && dm.mine.away) add(true, 'Nombra el partido del expediente', matchName(c.match));
+    else if (dm.other) add(false, 'Nombra otro partido', `${matchName(dm.other)} · ${fmtD(dm.other.kickoff)}`);
+    else add(null, 'Partido', dm.mine.home || dm.mine.away ? `nombra a ${dm.mine.home ? c.match.home : c.match.away}` : 'la página no nombra los equipos');
+  }
+  const ch = (s && s.channels) || [];
+  add(ch.length ? true : null, 'Canal anunciado', ch.length ? ch.map(x => x.name + (x.lic ? ` (${x.lic})` : '')).join(', ') : 'no menciona canal');
+  const auth = (a.hosts || []).filter(h => h.roles.some(r => r === 'pagina' || r === 'embed')).map(h => [h.host, authorizedHost(h.host)]).filter(x => x[1]);
+  add(auth.length ? false : true, auth.length ? 'Dominio de un licenciatario autorizado' : 'La página no es de un licenciatario', auth.length ? auth.map(([h, l]) => `${h} → ${l.name}`).join(', ') + ': distribución autorizada, no corresponde expediente' : 'ni la página ni los reproductores embebidos son dominios autorizados');
+  if (!st) add(null, 'Stream en vivo', manifestOf(c) ? 'todavía no se capturó el stream' : 'sin manifiesto .m3u8');
+  else {
+    add(st.live.isLive ? true : false, st.live.isLive ? 'Stream en vivo' : 'El stream no está en vivo', st.live.isLive ? `la secuencia avanzó de ${st.live.firstSequence} a ${st.live.secondSequence} entre ${fmt(st.live.firstAt)} y ${fmt(st.live.secondAt)}` : st.live.endList ? 'el manifiesto está cerrado (grabación / VOD)' : 'la secuencia no avanzó');
+    const ko = new Date(c.match.kickoff).getTime(), t = new Date(st.capturedAt).getTime();
+    add(t >= ko - 30 * 60e3 && t <= ko + 3 * 3600e3 ? true : null, 'Capturado durante el partido', `captura ${fmt(st.capturedAt)} · inicio ${fmt(c.match.kickoff)}`);
+    const segs = c.captures.filter(x => x.kind === 'segmento' && x.source && x.source.manifest === st.mediaPlaylist);
+    add(segs.length && segs.every(x => realTsa(x.tsa)) ? true : segs.length ? null : false, 'Segmentos del stream con SHA-256 y sello RFC 3161', segs.length ? `${segs.length} segmento(s)` : 'no se pudieron bajar segmentos');
+    add(st.frame ? true : false, 'Fotograma para el detector de marca de agua', st.frame ? `${st.frame.width}×${st.frame.height}, SHA-256 ${st.frame.sha256.slice(0, 16)}…` : st.frameError || 'sin fotograma');
+  }
+  return out;
+}
+function streamVerdict(c, ch) {
+  const get = (t) => ch.find(x => x.t === t);
+  if (ch.some(x => x.t === 'Dominio de un licenciatario autorizado')) return ['bad', 'Es un dominio autorizado: no corresponde expediente'];
+  const player = get('Reproductor de video en la página'), foot = get('Contenido de fútbol'), live = get('Stream en vivo');
+  if (player && player.ok && foot && foot.ok && live && live.ok) return ['ok', 'Streaming de fútbol en vivo verificado' + (ch.some(x => x.t === 'Nombra otro partido') ? ' (pero nombra otro partido)' : '')];
+  if (player && player.ok && foot && foot.ok) return ['warn', c.stream ? 'Streaming de fútbol, pero el stream no está en vivo' : 'Parece streaming de fútbol: falta capturar el stream'];
+  return ['bad', 'No se confirmó que sea un streaming de fútbol'];
+}
+function streamCard(c, ro) {
+  if (!c.analysis) return `<div class="card step"><div class="fig">PASO 0.0</div><h2>Verificación del stream de fútbol</h2><p class="small mut">Corré el análisis (PASO 2.0) o usá “Crear y verificar”: se detecta el reproductor, el partido y el canal, se comprueba que el stream esté en vivo y se capturan segmentos y un fotograma con hash y sello.</p></div>`;
+  const ch = streamChecks(c); const [v, txt] = streamVerdict(c, ch); const dm = detectMatch(c);
+  return `<div class="card step ${v === 'ok' ? 'done' : v}"><div class="fig">PASO 0.0</div><h2>Verificación del stream de fútbol</h2>
+  <div class="verdict ${v}">${v === 'ok' ? '✔ ' : v === 'bad' ? '✖ ' : ''}${esc(txt)}</div>
+  <ul class="check small">${ch.map(x => `<li>${x.ok === true ? '<i class="ck y"></i>' : x.ok === false ? '<i class="ck n"></i>' : '<i class="ck w"></i>'} <span><b>${esc(x.t)}</b> · ${esc(x.d)}</span></li>`).join('')}</ul>
+  ${c.stream ? `<div class="small mut">Manifiesto ${esc(c.stream.mediaPlaylist)}${c.stream.variant ? ` · variante ${esc(c.stream.variant.resolution || '')} ${Math.round((c.stream.variant.bandwidth || 0) / 1000)} kbps` : ''} · SHA-256 del manifiesto ${esc((c.stream.mediaPlaylistSha256 || '').slice(0, 16))}…</div>` : ''}
+  ${!ro && dm && dm.other && !(dm.mine.home && dm.mine.away) ? `<button class="ghost" onclick="setCaseMatch('${c.id}','${esc(dm.other.id)}')">Cambiar al partido detectado: ${esc(matchName(dm.other))}</button>` : ''}
+  ${!ro && manifestOf(c) ? `<div class="row noprint" style="margin-top:8px"><button onclick="streamCaptureBtn('${c.id}')">${c.stream ? 'Volver a capturar el stream' : 'Capturar el stream (segmentos + fotograma)'}</button></div><div id="strStatus"></div>` : ''}</div>`;
+}
+window.setCaseMatch = async (id, mid) => {
+  const c = getCase(id), m = matchById(mid); if (!c || c.seal || !m) return;
+  const prev = matchName(c.match);
+  c.match = { id: m.id, home: m.home, away: m.away, kickoff: m.kickoff, round: m.round || null, venue: m.venue || null, league: m.league || 'Liga Profesional de Fútbol' };
+  if (c.watermark) c.watermark = await checkWatermark(c, c.watermark.payload);
+  save(); await audit('partido_cambiado', id, `${prev} → ${matchName(m)}`); route();
 };
 window.doWatermark = async (id) => {
   const c = getCase(id); const p = $('#wmIn').value;
@@ -515,14 +700,17 @@ window.addPromo = async (id) => {
 };
 window.doExpiry = async (id) => { const c = getCase(id); c.expiry = proposeExpiry(c); save(); await audit('vencimiento_propuesto', id, c.expiry.why); route(); };
 window.setUntil = async (id, i, v) => { const c = getCase(id); c.expiry.items[i].until = new Date(v + 'T23:59:00-03:00').toISOString(); c.expiry.edited = true; save(); await audit('vencimiento_editado', id, `${c.expiry.items[i].target} → ${v}`); };
-function sealPayload(c) { const { seal, estado, signature, annexOf, rejection, remoteId, ...rest } = c; const r = JSON.parse(JSON.stringify(rest)); r.captures.forEach(x => delete x.thumb); return r; }
-window.sealCase = async (id) => {
-  const c = getCase(id);
-  if (score(c).pct < 50 && !confirm('El expediente tiene solidez baja. ¿Sellar igual?')) return;
+function sealPayload(c) { const { seal, estado, signature, annexOf, rejection, remoteId, ...rest } = c; const r = JSON.parse(JSON.stringify(rest)); r.captures.forEach(x => { delete x.thumb; delete x.html64; delete x.data64; }); return r; }
+async function sealNow(c) {
   const hash = await sha256Hex(stable(sealPayload(c)));
   toast('Sellando…');
   c.seal = { sha256: hash, sealedAt: new Date().toISOString(), tsa: await stampFor(c, hash) }; save();
-  await audit('expediente_sellado', id, `v${c.version} sha256=${hash}`); route();
+  await audit('expediente_sellado', c.id, `v${c.version} sha256=${hash}`);
+}
+window.sealCase = async (id) => {
+  const c = getCase(id);
+  if (score(c).pct < 50 && !confirm('El expediente tiene solidez baja. ¿Sellar igual?')) return;
+  await sealNow(c); route();
 };
 window.reopen = async (id) => {
   const c = getCase(id); if (!confirm('Se abre una nueva versión editable. El sello anterior queda en el historial.')) return;

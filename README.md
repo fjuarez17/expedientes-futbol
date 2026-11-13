@@ -94,6 +94,17 @@ Función serverless `api/analyze` que:
 - Se guarda una miniatura chica de las fotos para el PDF.
 - Se probó la verificación externa con `openssl ts -verify` → `Verification: OK`.
 
+#### 4 bis. Verificación del stream de fútbol (PASO 0.0, automática)
+
+“Crear y verificar” en **Nuevo expediente**:
+
+- `api/analyze` además arma un **perfil de la página** (`api/_futbol.js`): reproductor (Clappr, JW Player, hls.js, Video.js, P2P…), palabras de fútbol, canal anunciado (ESPN, TNT Sports, DSports, TyC…) con su licenciatario. En el navegador se buscan los equipos en el fixture: avisa si la página nombra otro partido y deja cambiarlo.
+- `api/stream-capture` baja el `.m3u8` (la variante más liviana con video), lo vuelve a pedir una duración de segmento después para comprobar que **la secuencia avanza (en vivo)**, y baja los últimos 2 segmentos con su SHA-256, status, servidor y `PROGRAM-DATE-TIME`. Cada salto se valida contra IPs privadas.
+- El navegador recalcula el hash del segmento, saca un **fotograma real** (mux.js → MP4 → canvas → PNG) para el detector de marca de agua, y sella con RFC 3161 cada segmento, el fotograma y el HTML de la página (`api/capture`).
+- Veredicto: reproductor + contenido de fútbol + stream en vivo, y que ni la página ni los embebidos sean dominios de un licenciatario. También marca si se capturó durante el partido.
+- Página de prueba: `/prueba/en-vivo.html` imita un sitio de fútbol libre con un reproductor embebido y la señal pública de test de Unified Streaming (no es un partido).
+- Límites: segmentos cifrados (AES-128) o fMP4 se hashean pero no dan fotograma; si el `.m3u8` se arma por JS ofuscado o detrás de un challenge anti-bot, hay que pegarlo a mano.
+
 #### 5. Dónde se promocionó el enlace (extra)
 
 - Se carga la URL del posteo/mensaje; la red se detecta sola: **X, Discord, Telegram**, Facebook, Instagram, TikTok, WhatsApp, Reddit, YouTube u Otro.
