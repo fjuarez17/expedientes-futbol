@@ -270,7 +270,7 @@ async function vPanel() {
   const now = Date.now();
   const upcoming = allMatches().filter(m => new Date(m.kickoff).getTime() > now - 3 * 3600e3).sort((a, b) => a.kickoff.localeCompare(b.kickoff)).slice(0, 4);
   const cdn = cs.filter(c => c.analysis && c.analysis.hosts.some(h => h.host === c.analysis.deliveryHost && h.collateral.recommendation === 'bloquear_dominio')).length;
-  return `${hero('Expedientes', 'arma la prueba contra cada stream pirata del fútbol argentino: señal oficial, servidor que entrega el video, riesgo colateral y evidencia sellada.')}
+  return `${hero('Expedientes', 'la prueba contra cada stream pirata del fútbol argentino.')}
   <div class="grid">
     <div class="kpi"><b>${cs.length}</b><span>Expedientes</span></div>
     <div class="kpi"><b>${sealed}</b><span>Sellados</span></div>
@@ -281,7 +281,7 @@ async function vPanel() {
   ${sec('Próximos partidos', upcoming.length ? matchTiles(upcoming) : '<p>Sin partidos próximos cargados. <a href="#/partidos">Agregar partido</a></p>')}
   <div class="card"><div class="row sp"><h2>Últimos expedientes</h2><a href="#/expedientes">Ver todos</a></div><div class="list">${cs.slice(-5).reverse().map(caseRow).join('') || '<p class="mut">Todavía no hay expedientes.</p>'}</div>
   <div class="row"><a class="btn" href="#/nuevo">+ Nuevo expediente</a><a class="btn" href="#/informe">Informe general (PDF)</a></div></div>
-  <section class="sec"><h3 class="lbl">Cómo funciona</h3><div class="prose"><b>Así se arma un expediente.</b> Elegís el partido, pegás el enlace pirata y la plataforma sigue la cadena página → reproductor embebido → manifiesto de video → segmentos, para llegar al servidor que realmente entrega el video (host, IP, ASN). Evalúa cuántos sitios comparten esa IP, verifica la marca de agua forense contra el partido y el licenciatario, calcula hashes SHA-256 y pide sellos de tiempo RFC 3161 a una autoridad externa. Cada acción queda en un registro de auditoría encadenado por hash.</div></section>`;
+  <section class="sec"><h3 class="lbl">Cómo funciona</h3><div class="prose"><b>Así se arma un expediente.</b> Elegís el partido y pegás el enlace pirata. La plataforma encuentra el servidor que entrega el video, mide el riesgo colateral, valida la marca de agua y sella cada captura con una autoridad externa. Todo queda en un registro que cualquiera puede verificar.</div></section>`;
 }
 
 async function vPartidos() {
