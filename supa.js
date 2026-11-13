@@ -131,10 +131,19 @@ window.submitClaim = async () => {
 
 async function vAcceso() {
   if (SESSION) return `${hero('Acceso', 'con tu cuenta. Los permisos los decide la base: un juez solo ve su jurisdicción mientras dura su turno.')}<div class="card"><p>Sesión iniciada como <b>${esc(SESSION.user.email)}</b>${ME_JUEZ ? ' · juez' : ' · reportante'}</p><div class="row"><button class="ghost" onclick="logout()">Cerrar sesión</button>${ME_JUEZ ? '<a href="#/juez">Ir a la cola</a>' : ''}</div></div>`;
-  return `${hero('Acceso', 'para jueces y reportantes. Sin sesión la plataforma funciona en modo local, solo en este teléfono.')}<div class="card"><label>Mail</label><input id="lE" type="email" autocomplete="username"><label>Contraseña</label><input id="lP" type="password" autocomplete="current-password"><div class="row" style="margin-top:10px"><button onclick="login()">Entrar</button></div></div>`;
+  return `${hero('Acceso', 'para jueces y reportantes. Sin sesión la plataforma funciona en modo local, solo en este teléfono.')}<div class="card"><h2>Iniciar sesión</h2><label>Mail</label><input id="lE" type="email" autocomplete="username"><label>Contraseña</label><input id="lP" type="password" autocomplete="current-password"><div class="row" style="margin-top:10px"><button onclick="login()">Entrar</button></div></div>
+  <details class="card"><summary><b>Registrarse como juez</b></summary><p class="small mut">Crea tu cuenta y tu ficha. <b>Queda pendiente de que te asignen un turno</b>: sin turno activo la base no te deja leer ni firmar expedientes.</p><label>Nombre completo</label><input id="rNom" autocomplete="name"><label>Juzgado</label><input id="rJuz" placeholder="Juzgado Federal N.º … de Comodoro Py"><label>Mail</label><input id="rEm" type="email"><label>Contraseña (mínimo 8 caracteres)</label><input id="rPa" type="password" autocomplete="new-password"><label>Contacto (opcional)</label><input id="rCon" placeholder="celular o mail institucional"><div class="row" style="margin-top:10px"><button onclick="registerJudge()">Registrarme</button></div></details>`;
 }
 window.login = async () => { const { error } = await sb.auth.signInWithPassword({ email: $('#lE').value.trim(), password: $('#lP').value }); if (error) return toast(error.message); await refreshSession(); await audit('login', null, SESSION.user.email); go(ME_JUEZ ? '#/juez' : '#/panel'); };
 window.logout = async () => { await sb.auth.signOut(); await refreshSession(); route(); };
+window.registerJudge = async () => {
+  const body = { nombre: $('#rNom').value.trim(), juzgado: $('#rJuz').value.trim(), email: $('#rEm').value.trim(), password: $('#rPa').value, contacto: $('#rCon').value.trim() };
+  if (!body.nombre || !body.juzgado || !body.email || !body.password) return toast('Completá nombre, juzgado, mail y contraseña');
+  const r = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const d = await r.json().catch(() => ({}));
+  if (r.status !== 200) return toast(d.error || 'No se pudo registrar');
+  toast('Juez registrado. Iniciá sesión; falta que te asignen un turno.'); route();
+};
 
 const wrap = (name, pre, after) => { const f = routes[name]; const g = async (...a) => (await pre(...a)) + (await f(...a)); g.after = f.after; routes[name] = g; };
 wrap('juez', remoteJudge); wrap('transparencia', remoteRegistry);
